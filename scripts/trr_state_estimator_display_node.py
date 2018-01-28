@@ -16,6 +16,7 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
     def __init__(self, path, img_topic):
         trr_rpu.DebugImgPublisher.__init__(self, img_topic, '/trr_state_estimation/image_debug')
         self.s, self.c = 70., [500, 100] # scale and center of track display
+        self.s, self.c = 15., [380, 200] # vedrines
         self.path_points = np.array([ self._world_to_img(p) for p in path.points]).astype(np.int)
         path_len = path.dists[-1] - path.dists[0]
         lm_start_idx, lm_start_point   = path.find_point_at_dist_from_idx(0, _d=path_len-1.21)
@@ -24,7 +25,7 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
         self.lm_points = [tuple(self._world_to_img(lm_start_point).astype(np.int)), tuple(self._world_to_img(lm_finish_point).astype(np.int))]
         
     def _world_to_img(self, p_world):
-        p_world =np.array([-p_world[0], p_world[1]])
+        p_world = np.array([-p_world[0], p_world[1]])
         return self.s*p_world + self.c
         
     def _draw(self, img_bgr, model, path, y0=20, font_color=(0,255,255)):
@@ -56,7 +57,9 @@ class Node:
         robot_name = rospy.get_param('~robot_name', '')
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
         cam_name = rospy.get_param('~camera', prefix(robot_name, 'camera_road_front'))
-        self.path = trr_se.StateEstPath('/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz')
+        path_filename = rospy.get_param('~path_filename')
+        self.path = trr_se.StateEstPath(path_filename) #'/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz'
+        rospy.loginfo('### se_display_node loaded {}'.format(path_filename))
         self.im_pub = ImgPublisher(self.path, cam_name)
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='state est display')
         

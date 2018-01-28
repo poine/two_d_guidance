@@ -33,19 +33,19 @@ class Node(trr_rpu.PeriodicNode):
         rospy.loginfo(' using ref_frame: {}'.format(ref_frame))
 
         tdg_dir = rospkg.RosPack().get_path('two_d_guidance')
-        path_name = rospy.get_param('~path_name', 'track_trr_real_vel_1.npz')
-        fname = os.path.join(tdg_dir, 'paths/demo_z/{}'.format(path_name))
-        lookahead = rospy.get_param('~lookahead', 0.8)
+        path_name = rospy.get_param('~path_name', 'demo_z/track_trr_real_vel_1.npz')
+        fname = os.path.join(tdg_dir, 'paths/{}'.format(path_name))
+        lookahead = rospy.get_param('~lookahead_dist', 0.8)
         self.guidance = trr_gui.Guidance(lookahead=lookahead, path_fname=fname)
-
+        
         cmd_topic = rospy.get_param('~cmd_topic', '/caroline/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
-        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.dyn_cfg_callback)
         self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
 
-    def cfg_callback(self, config, level):
+    def dyn_cfg_callback(self, config, level):
         rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead_dist}, vel_setpoint: {vel_sp}".format(**config))
         self.guidance.set_mode(config['guidance_mode'])
         self.guidance.lookaheads[0].set_dist(config['lookahead_dist'])

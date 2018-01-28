@@ -12,7 +12,7 @@ import two_d_guidance.srv
 
 class Node:
 
-    def __init__(self, autostart=False):
+    def __init__(self):
         tdg_dir = rospkg.RosPack().get_path('two_d_guidance')
         default_path_filename = os.path.join(tdg_dir, 'paths/demo_z/track_trr_real.npz')
         path_filename = rospy.get_param('~path_filename', default_path_filename)
@@ -30,8 +30,9 @@ class Node:
         self.traffic_light_sub = trr_rpu.TrrTrafficLightSubscriber()
         #odom_topic = '/caroline_robot_hardware/diff_drive_controller/odom' # real
         #odom_topic = '/caroline/diff_drive_controller/odom'                # sim
-        odom_topic = '/odom'
+        odom_topic = '/odom'                                                # external remaping
         self.odom_sub = trr_rpu.OdomListener(odom_topic, 'state_estimator', 0.1, self.on_odom)
+        # unused for now
         self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model', self.on_vision_lane)
         self.dyn_cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_state_estimatorConfig, self.dyn_cfg_callback)
 

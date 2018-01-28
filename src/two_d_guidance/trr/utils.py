@@ -38,9 +38,9 @@ class TrrPath(tdg.path.Path):
             self.jerks = data['jerks']
         except KeyError:
             print(' -no vel/acc/jerk in archive, setting them to zero')
-            self.vels = v*np.ones(len(self.points))
-            self.accels = v*np.ones(len(self.points))
-            self.jerks = v*np.ones(len(self.points))
+            self.vels   = v*np.ones(len(self.points))
+            self.accels = np.zeros(len(self.points))
+            self.jerks  = np.zeros(len(self.points))
             
             
     def save(self, filename):
