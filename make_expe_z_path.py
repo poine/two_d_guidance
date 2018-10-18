@@ -26,6 +26,14 @@ def convert_ethz():
     p.save('/home/poine/work/oscar.git/oscar/oscar_control/paths/demo_z/track_ethz_cam1.npz')
     tdg.draw_path(plt.gcf(), plt.gca(), p)
     plt.show()
+
+def convert_ethz2():
+    p = tdg.Path(load='/home/poine/work/oscar.git/oscar/oscar_control/paths/demo_z/track_ethz_cam1_new_orig.npz')
+    p.transform([-0.6, 0])
+    p.save('/home/poine/work/oscar.git/oscar/oscar_control/paths/demo_z/track_ethz_cam1_new.npz')
+    tdg.draw_path(plt.gcf(), plt.gca(), p)
+    plt.show()
+    
     
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
@@ -33,4 +41,4 @@ if __name__ == '__main__':
     #fname, p = run()
     #tdg.draw_path(plt.gcf(), plt.gca(), p)
     #plt.show()
-    convert_ethz()
+    convert_ethz2()

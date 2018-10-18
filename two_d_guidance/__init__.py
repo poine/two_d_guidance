@@ -5,6 +5,7 @@ from two_d_guidance.path_factory import *
 from two_d_guidance.pure_pursuit import *
 from two_d_guidance.track import *
 from two_d_guidance.track_factory import *
+from two_d_guidance.rosmap import *
 
 class VelController:
     def __init__(self, v_sp=0.75):
