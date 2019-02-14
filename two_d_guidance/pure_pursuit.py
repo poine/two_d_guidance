@@ -4,6 +4,10 @@ import sys , math, numpy as np
 import two_d_guidance.path
 import pdb
 
+class Param:
+    def __init__(self):
+        self.L = 1.
+
 class EndOfPathException(Exception):
     pass
 
@@ -12,9 +16,11 @@ class PurePursuit:
         self.path = two_d_guidance.path.Path(load=path_file)
         self.params = params
         self.look_ahead = look_ahead
+        self.p2, self.R = [0, 0], 1e6
 
     def compute(self, cur_pos, cur_psi):
         p1, p2, end_reached, ip1, ip2 = self.path.find_carrot_looped(cur_pos, _d=self.look_ahead)
+        self.p2 = p2
         #if end_reached:
         #    raise EndOfPathException
 
@@ -24,5 +30,6 @@ class PurePursuit:
         p0p2_b = np.dot(w2b, p0p2_w)
         l = np.linalg.norm(p0p2_w)
         R = (l**2)/(2*p0p2_b[1])
+        self.R = R
         return 0, math.atan(self.params.L/R)
         #return R, p2 # Radius and carrot 
