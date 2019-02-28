@@ -73,9 +73,9 @@ class Node:
         self.v = rospy.get_param('~vel_setpoint', 0.5)
         rospy.loginfo(' using velocity setpoint {}'.format(self.v))
 
-        #self.smocap_listener = utils.SmocapListener()
+        self.smocap_listener = ros_utils.SmocapListener()
         #self.smocap_listener = utils.GazeboTruthListener(topic='/homere/base_link_truth')
-        self.smocap_listener = ros_utils.GazeboTruthListener(topic='/rosmip/base_link_truth')
+        #self.smocap_listener = ros_utils.GazeboTruthListener(topic='/rosmip/base_link_truth')
 
     def periodic(self):
         try:

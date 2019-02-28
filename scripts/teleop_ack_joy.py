@@ -19,14 +19,16 @@ class AckermannDriveJoyop:
 
     def __init__(self):
         cmd_topic = rospy.get_param('~cmd_topic', '/oscar_ackermann_controller/cmd_ack')
-        self.max_speed = 0.5
-        self.max_steering_angle = 0.7
+        self.max_speed = 1.
+        self.max_steering_angle = 0.5
         self.axis_speed = rospy.get_param('~axis_linear', 1)
         self.axis_steering = rospy.get_param('~axis_steering', 2)
+        self.enable_button = rospy.get_param('~enable_button', 4)
 
         rospy.loginfo('  Sending Ackermann messages to topic {}'.format(cmd_topic))
         self.speed = 0
         self.steering_angle = 0
+        self.enabled = False
         self.joy_sub = rospy.Subscriber('/joy', Joy, self.joy_callback)
         self.drive_pub = rospy.Publisher(cmd_topic, ackermann_msgs.msg.AckermannDriveStamped,
                                          queue_size=1)
@@ -37,16 +39,17 @@ class AckermannDriveJoyop:
         #print joy_msg
         self.speed = joy_msg.axes[self.axis_speed] * self.max_speed;
         self.steering_angle = joy_msg.axes[self.axis_steering] * self.max_steering_angle;
-
+        self.enabled = joy_msg.buttons[self.enable_button]
 
     def pub_callback(self, event):
-        ackermann_cmd_msg =  ackermann_msgs.msg.AckermannDriveStamped()
-        ackermann_cmd_msg.header.stamp = rospy.Time.now()
-        ackermann_cmd_msg.header.frame_id = 'odom'
-        ackermann_cmd_msg.drive.speed = self.speed
-        ackermann_cmd_msg.drive.steering_angle = self.steering_angle
-        self.drive_pub.publish(ackermann_cmd_msg)
-        #self.print_state()
+        if self.enabled:
+            ackermann_cmd_msg =  ackermann_msgs.msg.AckermannDriveStamped()
+            ackermann_cmd_msg.header.stamp = rospy.Time.now()
+            ackermann_cmd_msg.header.frame_id = 'odom'
+            ackermann_cmd_msg.drive.speed = self.speed
+            ackermann_cmd_msg.drive.steering_angle = self.steering_angle
+            self.drive_pub.publish(ackermann_cmd_msg)
+            #self.print_state()
 
     def print_state(self):
         sys.stderr.write('\x1b[2J\x1b[H')
