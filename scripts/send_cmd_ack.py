@@ -26,7 +26,7 @@ class Node:
             
 def main(args):
     rospy.init_node('send_cmd_ack', anonymous=True)
-    Node(vel=0.1, alpha=0.1).run()
+    Node(vel=0.1, alpha=0.0).run()
      
 if __name__ == '__main__':
    main(sys.argv)
