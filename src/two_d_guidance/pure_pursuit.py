@@ -33,3 +33,10 @@ class PurePursuit:
         self.R = R
         return 0, math.atan(self.params.L/R)
         #return R, p2 # Radius and carrot 
+
+    def compute_looped(self, cur_pos, cur_psi):
+        try:
+            return self.compute(cur_pos, cur_psi)
+        except EndOfPathException:
+            self.path.reset()
+            return self.compute(cur_pos, cur_psi)

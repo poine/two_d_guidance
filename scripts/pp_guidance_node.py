@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, roslib, rospy, nav_msgs.msg , geometry_msgs.msg, ackermann_msgs.msg, visualization_msgs.msg
+import os, sys, roslib, rospy, rospkg, nav_msgs.msg , geometry_msgs.msg, ackermann_msgs.msg, visualization_msgs.msg
 import math, numpy as np
 
 import two_d_guidance as tdg
@@ -66,35 +66,33 @@ class Node:
         if ack_cmd_topic is not None:
             self.publish_ack_cmd = True
             self.pub_ack = rospy.Publisher(ack_cmd_topic, ackermann_msgs.msg.AckermannDriveStamped, queue_size=1)
+            rospy.loginfo(' publishing ack commands on: {}'.format(ack_cmd_topic))
         else:
             self.publish_ack_cmd = False
+            rospy.loginfo(' publishing twist commands on: {}'.format(twist_cmd_topic))
             self.pub_twist = rospy.Publisher(twist_cmd_topic, geometry_msgs.msg.Twist, queue_size=1)
-        rospy.loginfo(' publishing twist commands on: {}'.format(twist_cmd_topic))
-        path_filename = rospy.get_param('~path_filename', '/home/poine/work/oscar.git/oscar/oscar_control/paths/demo_z/track_ethz_cam1_new.npz')
-
+            
+        path_filename = rospy.get_param('~path_filename', os.path.join(rospkg.RosPack().get_path('two_d_guidance'), 'paths/demo_z/track_ethz_cam1_new.npz'))
         param = tdg.pure_pursuit.Param()
         self.l = param.L = 0.08
         self.ctl = tdg.pure_pursuit.PurePursuit(path_filename, param)
 
         self.v = rospy.get_param('~vel_setpoint', 0.5)
-        self.robot_pose_topic_odom = rospy.get_param('~robot_pose_topic_odom', '/oscar_v0/base_link_truth')
-        self.smocap_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic_odom)
+        self.robot_pose_topic_odom = rospy.get_param('~robot_pose_topic_odom', None)
+        if self.robot_pose_topic_odom is not None:
+            self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic_odom)
+        else:
+            self.robot_listener = ros_utils.SmocapListener()
         
-        rospy.loginfo(' publishing twist commands on: {}'.format(twist_cmd_topic))
-        rospy.loginfo(' publishing ack commands on: {}'.format(ack_cmd_topic))
         rospy.loginfo(' loading path: {}'.format(path_filename))
-        rospy.loginfo('   velocity setpoint {} m/s'.format(self.v))
-        rospy.loginfo('   robot_pose_topic_odom {}'.format(self.robot_pose_topic_odom))
-        rospy.loginfo('   wheels_kinematic_l {} m'.format(self.l))
-        #self.smocap_listener = ros_utils.SmocapListener()
-        #self.smocap_listener = utils.GazeboTruthListener(topic='/homere/base_link_truth')
-        #self.smocap_listener = ros_utils.GazeboTruthListener(topic='/rosmip/base_link_truth')
-        #self.smocap_listener = ros_utils.GazeboTruthListener(topic='/odometry/filtered')
+        rospy.loginfo('   velocity setpoint: {} m/s'.format(self.v))
+        rospy.loginfo('   robot_pose_topic_odom: {}'.format(self.robot_pose_topic_odom))
+        rospy.loginfo('   wheels_kinematic_l: {} m'.format(self.l))
 
     def periodic(self):
         try:
             # get current pose
-            p0, psi = self.smocap_listener.get_loc_and_yaw()
+            p0, psi = self.robot_listener.get_loc_and_yaw()
             try:
                 _unused, self.alpha = self.ctl.compute(p0, psi)
             except tdg.pure_pursuit.EndOfPathException:
