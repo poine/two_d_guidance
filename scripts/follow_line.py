@@ -27,9 +27,10 @@ class LaneFinder:
 
 
     def process_image(self, img, cam_idx):
-        self.inputImageGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        self.inputImageGray = img#cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         self.edges = cv2.Canny(self.inputImageGray,100,200,apertureSize = 3)
-        h, w, depth = img.shape
+        #h, w, depth = img.shape
+        h, w = img.shape
         self.roi = region_of_interest_vertices(h, w)
         self.edges_cropped = region_of_interest(self.edges, self.roi)
         minLineLength = 25 

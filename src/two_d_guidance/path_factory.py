@@ -84,7 +84,7 @@ def make_oval_path(c1, c2, r):
     return line1
 
 
-def make_fig_of_height_path2(c, d, r):
+def make_fig_of_eight_path2(c, d, r):
     c1 = c + [0, d]
     circle1 = make_circle_path(c1, -r, -math.pi, 0, n_pt=100)
     c2 = c + [0, -d]
@@ -94,7 +94,7 @@ def make_fig_of_height_path2(c, d, r):
     circle1.append([line1, circle2, line2])
     return circle1
 
-def make_fig_of_height_path2(r):
+def make_fig_of_eight_path2(r):
     p = make_circle_path([r, 0], r, -np.pi, 2*np.pi, 360)
     p2 = make_circle_path([-r, 0], -r, 0, 2*np.pi, 360)
     p.append([p2])
@@ -121,7 +121,7 @@ def make_clover_path(r1=1., r2=2.):
     return circ1
 
 
-def make_el_fig_of_height_path(d1, d2):
+def make_el_fig_of_eight_path(d1, d2):
     #p = make_ellipse_path([-12.6, 0], [-0.6, 0], 13.2, 0, 2*np.pi, cw=False)
     #p2 = make_ellipse_path([0.6, 0], [12.6, 0], 13.2, -np.pi, np.pi, cw=True)
     p = make_ellipse_path([-d1-d2, 0], [-d2, 0], d1+2*d2, 0, 2*np.pi, cw=False)
@@ -149,6 +149,19 @@ def make_inscribed_circles_path(r1=1, r2=2):
     c14 = make_circle_path([-(r1+r2), 0], -r1, -np.pi, np.pi, n_pt=180)
     c1.append([c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14])
     return c1
+
+
+def make_reversed_path(_pf):
+    _points = _pf.points[::-1]
+    _dists = _pf.dists[-1]-_pf.dists[::-1]
+    _headings = _pf.headings[::-1] + np.pi # todo: Normalize
+    _curvatures = -_pf.curvatures[::-1]
+    _pr = path.Path()
+    _pr.append_points(_points, _headings, _dists, _curvatures)
+    #pdb.set_trace()
+    return _pr
+
+
 
 def check_curvature(p):
     orig_curv = np.array(p.curvatures)
