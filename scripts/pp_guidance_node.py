@@ -57,6 +57,14 @@ class NodePublisher:
         self.pub_arc.publish(path_msg)
 
 
+class VelSetpointCst:
+    def __init__(self, _v):
+        self.v = _v
+
+    def get(self, t):
+          return self.v + self.v/2*np.sin(0.1*t)
+
+        
 class Node:
     def __init__(self):
         self.node_pub = NodePublisher()
@@ -76,8 +84,9 @@ class Node:
         param = tdg.pure_pursuit.Param()
         self.l = param.L = 0.08
         self.ctl = tdg.pure_pursuit.PurePursuit(path_filename, param)
+        self.v_sp = rospy.get_param('~vel_setpoint', 0.5)
+        self.v_ctl = VelSetpointCst(self.v_sp)
 
-        self.v = rospy.get_param('~vel_setpoint', 0.5)
         self.robot_pose_topic_odom = rospy.get_param('~robot_pose_topic_odom', None)
         if self.robot_pose_topic_odom is not None:
             self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic_odom)
@@ -85,7 +94,7 @@ class Node:
             self.robot_listener = ros_utils.SmocapListener()
         
         rospy.loginfo(' loading path: {}'.format(path_filename))
-        rospy.loginfo('   velocity setpoint: {} m/s'.format(self.v))
+        rospy.loginfo('   velocity setpoint: {} m/s'.format(self.v_sp))
         rospy.loginfo('   robot_pose_topic_odom: {}'.format(self.robot_pose_topic_odom))
         rospy.loginfo('   wheels_kinematic_l: {} m'.format(self.l))
 
@@ -93,25 +102,30 @@ class Node:
         try:
             # get current pose
             p0, psi = self.robot_listener.get_loc_and_yaw()
-            try:
-                _unused, self.alpha = self.ctl.compute(p0, psi)
-            except tdg.pure_pursuit.EndOfPathException:
-                self.ctl.path.reset()
-                _unused, self.alpha = self.ctl.compute(p0, psi)
-            else:
-                if self.publish_ack_cmd:
-                    self.publish_ackermann_cmd()
-                else:
-                    self.publish_twist_cmd()
+            _unused, self.alpha = self.ctl.compute_looped(p0, psi)
+            self.v = self.v_ctl.get(rospy.Time.now().to_sec())
+            # try:
+            #     _unused, self.alpha = self.ctl.compute(p0, psi)
+            # except tdg.pure_pursuit.EndOfPathException:
+            #     self.ctl.path.reset()
+            #     _unused, self.alpha = self.ctl.compute(p0, psi)
+            #else:
+            self.publish_command()
         except ros_utils.RobotLostException:
-            print('robot lost\r')
+             rospy.loginfo_throttle(0.5, 'robot lost')
         except ros_utils.RobotNotLocalizedException:
-            print('robot not localized\r')
+            rospy.loginfo_throttle(1., "Robot not localized") # print every second
         self.node_pub.publish_path(self.ctl.path) # expensive...
         self.node_pub.publish_debug(self.ctl.p2, self.ctl.R)
 
+    def publish_command(self):
+            if self.publish_ack_cmd:
+                self.publish_ackermann_cmd()
+            else:
+                self.publish_twist_cmd()
+        
+        
     def publish_twist_cmd(self):
-        #print self.alpha
         lin = self.v
         ang = self.v/self.l*math.tan(self.alpha)
         msg = geometry_msgs.msg.Twist()
