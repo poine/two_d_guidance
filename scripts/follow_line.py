@@ -15,8 +15,8 @@ def region_of_interest(img, vertices):
 def region_of_interest_vertices(height, width):
     return np.array([[
     (0, height),
-    (0.3*width, 0.2*height),
-    (0.7*width, 0.2*height),
+    (0.4*width, 0.6*height),
+    (0.6*width, 0.6*height),
     (width, height),
     ]], dtype=np.int32)
 
@@ -27,10 +27,11 @@ class LaneFinder:
 
 
     def process_image(self, img, cam_idx):
-        self.inputImageGray = img#cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        #self.inputImageGray = img
+        self.inputImageGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         self.edges = cv2.Canny(self.inputImageGray,100,200,apertureSize = 3)
-        #h, w, depth = img.shape
-        h, w = img.shape
+        h, w, depth = img.shape
+        #h, w = img.shape
         self.roi = region_of_interest_vertices(h, w)
         self.edges_cropped = region_of_interest(self.edges, self.roi)
         minLineLength = 25 

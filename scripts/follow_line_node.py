@@ -2,6 +2,9 @@
 
 import sys, numpy as np, rospy, sensor_msgs.msg
 import cv2, cv_bridge
+
+import pdb
+
 #import smocap
 import smocap.rospy_utils
 import follow_line
@@ -41,7 +44,7 @@ class ImgPublisher:
 class Node:
 
     def __init__(self):
-        self.low_freq = 2.
+        self.low_freq = 15.
         cam_names = rospy.get_param('~cameras', 'oscar_v0/camera1').split(',')
         self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(cam_names, fetch_extrinsics=False)
         self.lane_finder = follow_line.LaneFinder()
@@ -49,6 +52,7 @@ class Node:
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
 
     def on_image(self, img, (cam_idx, stamp, seq)):
+        #pdb.set_trace()
         self.lane_finder.process_image(img, cam_idx)
 
     def periodic(self):

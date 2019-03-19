@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import os, sys, roslib, rospy, rospkg, nav_msgs.msg , geometry_msgs.msg, ackermann_msgs.msg, visualization_msgs.msg
+import os, sys, roslib, rospy, rospkg, rostopic
+import nav_msgs.msg , geometry_msgs.msg, ackermann_msgs.msg, visualization_msgs.msg
 import math, numpy as np
 
 import two_d_guidance as tdg
@@ -62,7 +63,7 @@ class VelSetpointCst:
         self.v = _v
 
     def get(self, t):
-          return self.v + self.v/2*np.sin(0.1*t)
+          return self.v #+ self.v/2*np.sin(0.1*t)
 
         
 class Node:
@@ -87,15 +88,32 @@ class Node:
         self.v_sp = rospy.get_param('~vel_setpoint', 0.5)
         self.v_ctl = VelSetpointCst(self.v_sp)
 
-        self.robot_pose_topic_odom = rospy.get_param('~robot_pose_topic_odom', None)
-        if self.robot_pose_topic_odom is not None:
-            self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic_odom)
-        else:
+        
+        self.robot_pose_topic = rospy.get_param('~robot_pose_topic', None)
+        print self.robot_pose_topic
+        msg_class, _msg_topic, _unused = rostopic.get_topic_class(self.robot_pose_topic)
+        print msg_class
+        if msg_class == geometry_msgs.msg.PoseWithCovarianceStamped:
+            print 'using geometry_msgs.msg.PoseWithCovarianceStamped for robot location'
             self.robot_listener = ros_utils.SmocapListener()
+        elif msg_class == nav_msgs.msg.Odometry:
+            print 'using nav_msgs.msg.Odometry for robot location'
+            self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic)
+        else:
+            print 'unsupported robot location message type'
+            rospy.signal_shutdown('unsupported robot location message class')
+            
+        # if self.robot_pose_topic_odom is not None:
+        #     self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic_odom)
+        # else:
+        #     self.robot_listener = ros_utils.SmocapListener()
+
+
+            
         
         rospy.loginfo(' loading path: {}'.format(path_filename))
         rospy.loginfo('   velocity setpoint: {} m/s'.format(self.v_sp))
-        rospy.loginfo('   robot_pose_topic_odom: {}'.format(self.robot_pose_topic_odom))
+        rospy.loginfo('   robot_pose_topic: {}'.format(self.robot_pose_topic))
         rospy.loginfo('   wheels_kinematic_l: {} m'.format(self.l))
 
     def periodic(self):
