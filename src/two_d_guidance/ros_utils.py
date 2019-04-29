@@ -51,7 +51,7 @@ class GazeboTruthListener:
         self.vel = abs(self.twist.linear.x)
         self.ts = msg.header.stamp.to_sec()
 
-    def get_loc_and_yaw(self, max_delay=0.1):
+    def get_loc_and_yaw(self, max_delay=0.2):
         if self.ts is None:
             raise RobotNotLocalizedException
         if rospy.Time.now().to_sec() - self.ts > max_delay:
