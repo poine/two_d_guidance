@@ -10,3 +10,42 @@ def normalize_headings(h):
 
 def pt_on_circle(c, r, th):
     return c + np.stack([r*np.cos(th), r*np.sin(th)], axis=-1)
+
+
+
+#
+#  Linear reference models
+#
+
+class LinRef:
+    ''' Linear Reference Model (with first order integration)'''
+    def __init__(self, K):
+        '''K: coefficients of the caracteristic polynomial, in ascending powers order,
+              highest order ommited (normalized to -1)'''
+        self.K = K; self.order = len(K)
+        self.X = np.zeros(self.order+1)
+
+    def run(self, dt, sp):
+        self.X[:self.order] += self.X[1:self.order+1]*dt
+        e =  np.array(self.X[:self.order]); e[0] -= sp
+        self.X[self.order] = np.sum(e*self.K)
+        return self.X
+
+    def poles(self):
+        return np.roots(np.insert(np.array(self.K[::-1]), 0, -1))
+
+    def reset(self, X0=None):
+        if X0 is None: X0 = np.zeros(self.order+1)
+        self.X = X0
+
+
+class FirstOrdLinRef(LinRef):
+    def __init__(self, tau):
+        LinRef.__init__(self, [-1/tau])
+
+class SecOrdLinRef(LinRef):
+    def __init__(self, omega, xi):
+        LinRef.__init__(self, [-omega**2, -2*xi*omega])
+
+
+
