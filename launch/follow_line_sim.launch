@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="start_gazebo" default="true" />
+  <arg name="start_filter" default="true" />
+  <arg name="start_teleop" default="true" />
+  <arg name="start_fl_lane_detect" default="true" />
+  <arg name="start_fl_guidance" default="true" />
+  <arg name="start_viz" default="true" />
+  
+  <arg name="world_name" default="$(find common_simulations)/worlds/track_trr.world" />
+  <arg name="robot_type" default="nono" />
+  <arg name="robot_name" default="nono_0" />
+
+  <arg name="filter_use_gz_truth" default="true"/>
+  <arg name="robot_marker" default="0" />
+
+  <!--  process args -->
+  <arg name="sim_pkg" value="$(arg robot_type)_simulator"/>
+  <arg name="guid_pkg" value="$(arg robot_type)_guidance"/>
+  
+  <!--  ****** Gazebo and robot therein *****  -->
+  <group if="$(arg start_gazebo)">
+    <include file="$(eval find(arg('sim_pkg')) + '/launch/empty_world.launch')">	
+      <arg name="start_gazebo" value="$(arg start_gazebo)" />
+      <arg name="world_name" value="$(arg world_name)" />
+      <arg name="robot_name" value="$(arg robot_name)" />
+      <arg name="robot_initial_xy" value="-x -0.5 -y 1.75"/>
+    </include>
+  </group>
+  
+  <!--  ****** Navigation Filter *****  -->
+  <group if="$(arg start_filter)">
+    <include file="$(find nono_guidance)/launch/robot_localization_ekf.launch">
+      <arg name="robot_name"   value="$(arg robot_name)" />
+      <arg name="robot_marker" value="$(arg robot_marker)" />
+      <arg name="use_gz_truth" value="$(arg filter_use_gz_truth)" /> 
+    </include>
+    <node name="gazebo_truth_fix" pkg="nono_guidance" type="fix_gazebo_truth.py" />
+    <node name="world_to_map_publisher" pkg="tf" type="static_transform_publisher"
+          args="0 0 0  0 0 0 world map 100"/>*
+  </group>
+  
+  <!--  ****** Teleop *****  -->
+  <group if="$(arg start_teleop)">
+    <include file="$(eval find(arg('guid_pkg')) + '/launch/teleop.launch')">
+      <arg name="robot_name"   value="$(arg robot_name)" />
+    </include>	
+  </group>
+  
+  <!--  ****** Lane detection *****  -->
+  <group if="$(arg start_fl_lane_detect)">
+    <node name="follow_line_lane_detector" pkg="two_d_guidance" type="fl_lane_detect_node.py">
+      <param name="cameras" value="$(arg robot_name)/camera1"/>
+      <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
+    </node>
+  </group>
+
+  <!--  ****** Lane detection and guidance *****  -->
+  <group if="$(arg start_fl_guidance)">
+    <node name="follow_line_guidance" pkg="two_d_guidance" type="fl_guidance_node.py" >
+      <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
+      <param name="cmd_topic" value="$(arg robot_name)/diff_drive_controller/cmd_vel"/>
+    </node>
+  </group>
+  
+  <!--  ****** Viz *****  -->
+  <group if="$(arg start_viz)">
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find two_d_guidance)/rviz/follow_line_$(arg robot_name).rviz" />
+  </group>
+
+ 
+    
+</launch>
