@@ -35,7 +35,7 @@
       <arg name="robot_marker" value="$(arg robot_marker)" />
       <arg name="use_gz_truth" value="$(arg filter_use_gz_truth)" /> 
     </include>
-    <node name="gazebo_truth_fix" pkg="nono_guidance" type="fix_gazebo_truth.py" />
+    <node name="gazebo_truth_fix" pkg="common_simulations" type="fix_gazebo_truth.py" />
     <node name="world_to_map_publisher" pkg="tf" type="static_transform_publisher"
           args="0 0 0  0 0 0 world map 100"/>*
   </group>
