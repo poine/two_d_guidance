@@ -93,7 +93,7 @@ class Node:
         if 1:
             self.lane_model_sub.get(self.lane_model)
 
-        lin, ang =  self.guidance.compute(self.lane_model, expl_noise=0.1)
+        lin, ang =  self.guidance.compute(self.lane_model, lin=0.4, expl_noise=0.)
         self.publisher.publish_cmd(lin, ang)
         self.publisher.publish_arc(self.guidance.R, self.guidance.carrot)
         self.publisher.publish_carrot(self.guidance.carrot)

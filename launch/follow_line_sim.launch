@@ -8,8 +8,8 @@
   <arg name="start_viz" default="true" />
   
   <arg name="world_name" default="$(find common_simulations)/worlds/track_trr.world" />
-  <arg name="robot_type" default="nono" />
-  <arg name="robot_name" default="nono_0" />
+  <arg name="robot_type" default="roverboard" />
+  <arg name="robot_name" default="pierrette" />
 
   <arg name="filter_use_gz_truth" default="true"/>
   <arg name="robot_marker" default="0" />
