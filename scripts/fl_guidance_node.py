@@ -4,7 +4,7 @@ import numpy as np
 import roslib, rospy, rospkg, rostopic
 import nav_msgs.msg , geometry_msgs.msg, visualization_msgs.msg
 
-import fl_utils as flu, follow_line_node as fln
+import fl_utils as flu#, follow_line_node as fln
 
 
 class Publisher:
