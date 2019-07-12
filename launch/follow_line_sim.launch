@@ -4,6 +4,7 @@
   <arg name="start_filter" default="true" />
   <arg name="start_teleop" default="true" />
   <arg name="start_fl_lane_detect" default="true" />
+  <arg name="start_fl_fake_lane_detect" default="false" />
   <arg name="start_fl_guidance" default="true" />
   <arg name="start_viz" default="true" />
   
@@ -24,7 +25,7 @@
       <arg name="start_gazebo" value="$(arg start_gazebo)" />
       <arg name="world_name" value="$(arg world_name)" />
       <arg name="robot_name" value="$(arg robot_name)" />
-      <arg name="robot_initial_xy" value="-x -0.5 -y 1.75"/>
+      <arg name="robot_initial_xy" value="-x -0.3 -y 1.75"/>
     </include>
   </group>
   
@@ -35,10 +36,14 @@
       <arg name="robot_marker" value="$(arg robot_marker)" />
       <arg name="use_gz_truth" value="$(arg filter_use_gz_truth)" /> 
     </include>
-    <node name="gazebo_truth_fix" pkg="common_simulations" type="fix_gazebo_truth.py" />
     <node name="world_to_map_publisher" pkg="tf" type="static_transform_publisher"
           args="0 0 0  0 0 0 world map 100"/>*
   </group>
+
+  <!-- Fix gazebo not doing frames namespacing -->
+  <node name="gazebo_truth_fix" pkg="common_simulations" type="fix_gazebo_truth.py">
+    <param name="robot_name"   value="$(arg robot_name)" />
+  </node>
   
   <!--  ****** Teleop *****  -->
   <group if="$(arg start_teleop)">
@@ -55,7 +60,15 @@
     </node>
   </group>
 
-  <!--  ****** Lane detection and guidance *****  -->
+  <!--  ****** Fake Lane detection *****  -->
+  <group if="$(arg start_fl_fake_lane_detect)">
+    <node name="follow_line_lane_fake_detector" pkg="two_d_guidance" type="fl_fake_detector_node.py">
+      <param name="robot_name" value="$(arg robot_name)"/>
+      <param name="robot_pose_topic" value="/$(arg robot_name)/base_link_truth1" />
+    </node>
+  </group>
+
+  <!--  ****** Lane guidance *****  -->
   <group if="$(arg start_fl_guidance)">
     <node name="follow_line_guidance" pkg="two_d_guidance" type="fl_guidance_node.py" >
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
