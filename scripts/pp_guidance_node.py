@@ -118,13 +118,14 @@ class Node:
             # get current pose
             p0, psi = self.robot_listener.get_loc_and_yaw()
             _unused, self.alpha = self.ctl.compute_looped(p0, psi)
+            self.alpha += 0.025*np.sin(0.5*rospy.Time.now().to_sec())
             self.v = self.v_ctl.get(rospy.Time.now().to_sec())
             self.publish_command()
         except ros_utils.RobotLostException:
              rospy.loginfo_throttle(0.5, 'robot lost')
         except ros_utils.RobotNotLocalizedException:
             rospy.loginfo_throttle(1., "Robot not localized") # print every second
-        #self.node_pub.publish_path(self.ctl.path) # expensive... 50% CPU
+        self.node_pub.publish_path(self.ctl.path) # expensive... 50% CPU
         self.node_pub.publish_debug(self.ctl.p2, self.ctl.R) 
 
     def publish_command(self):

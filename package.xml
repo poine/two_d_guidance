@@ -46,6 +46,8 @@
   <build_depend>message_generation</build_depend>
   <build_depend>eigen</build_depend>
   <exec_depend>message_runtime</exec_depend>
+  <build_depend>dynamic_reconfigure</build_depend>
+  <exec_depend>dynamic_reconfigure</exec_depend>
   <buildtool_depend>catkin</buildtool_depend>
 
   <!-- The export tag contains other, unspecified, tags -->

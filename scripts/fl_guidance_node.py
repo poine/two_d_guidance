@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 import os, sys
 import numpy as np
-import roslib, rospy, rospkg, rostopic
+import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg, visualization_msgs.msg
 
 import fl_utils as flu#, follow_line_node as fln
-
+import two_d_guidance.srv
+import two_d_guidance.cfg.fl_guidanceConfig
 
 class Publisher:
     def __init__(self):
@@ -58,14 +59,21 @@ class Publisher:
         
         
 class Guidance:
-
-    def compute(self, lane_model, lookahead=0.4, lin=0.25, expl_noise=0.025):
-        self.carrot = [lookahead, lane_model.get_y(lookahead)]
+    mode_idle, mode_driving, mode_nb = range(3)
+    def __init__(self, lookahead=0.4):
+        self.lookahead = lookahead
+        self.mode =  Guidance.mode_idle
+        self.carrot = [lookahead, 0]
+        self.R = np.inf
+    
+    def compute(self, lane_model, lin=0.25, expl_noise=0.025):
+        self.carrot = [self.lookahead, lane_model.get_y(self.lookahead)]
         self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
         lin, ang = lin, lin/self.R
         ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
         return lin, ang
-        
+
+    
 import pdb
 
 
@@ -77,29 +85,33 @@ class Node:
         #self.real_line_finder = fln.Node()
         self.lane_model_sub = flu.LaneModelSubscriber()
         self.lane_model = flu.LaneModel()
-        self.guidance = Guidance()
+        self.guidance = Guidance(lookahead=0.6)
         self.publisher = Publisher()
- 
-       
+        self.set_mode_svc = rospy.Service('set_mode', two_d_guidance.srv.SetMode, self.handle_set_mode)
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_guidanceConfig, self.cfg_callback)
+        self.guidance.mode = Guidance.mode_driving
+
+    def cfg_callback(self, config, level):
+        rospy.loginfo("  Reconfigure Request: {int_param}, {lookahead}, {str_param}, {bool_param}, {size}".format(**config))
+        self.guidance.lookahead = config['lookahead']
+        return config
+
+        
+    def handle_set_mode(self, req):
+        print("Setting mode to {}".format(req.a))
+        self.guidance.mode = req.a
+        return two_d_guidance.srv.SetModeResponse(42)
 
     def periodic(self):
-        if 0:
-            self.fake_line_detector.compute_line()
-            if self.fake_line_detector.path_body is not None and len(self.fake_line_detector.path_body) > 3:
-                self.lane_model.fit(self.fake_line_detector.path_body)
-        if 0:
-            if self.real_line_finder.lane_finder.floor_plane_injector.contour_floor_plane_blf is not None:
-                self.lane_model.fit(self.real_line_finder.lane_finder.floor_plane_injector.contour_floor_plane_blf[:,:2])
-        if 1:
-            self.lane_model_sub.get(self.lane_model)
-
-        lin, ang =  self.guidance.compute(self.lane_model, lin=0.4, expl_noise=0.)
+        self.lane_model_sub.get(self.lane_model)
+        if self.guidance.mode == Guidance.mode_driving:
+            lin, ang =  self.guidance.compute(self.lane_model, lin=0.2, expl_noise=0.)
+        else:
+            lin, ang = 0, 0
         self.publisher.publish_cmd(lin, ang)
         self.publisher.publish_arc(self.guidance.R, self.guidance.carrot)
         self.publisher.publish_carrot(self.guidance.carrot)
         self.publisher.publish_lane(self.lane_model)
-        #self.real_line_finder.publish_lane()
-        #self.real_line_finder.publish_image()
     
     def run(self):
         rate = rospy.Rate(self.low_freq)

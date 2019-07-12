@@ -14,20 +14,27 @@ class LaneModel:
     # y = an.x^n + ...
     def __init__(self):
         self.coefs = [0., 0., 0., 0.01, 0.05]
+        self.valid = False
 
+    def is_valid(self): return self.valid
+    def set_valid(self, v): self.valid = v
+        
     def get_y(self, x):
         return np.polyval(self.coefs, x)
 
     def fit(self, pts, order=3):
         self.coefs = np.polyfit(pts[:,0], pts[:,1], order)
+        self.x_min, self.x_max = np.min(pts[:,0]), np.max(pts[:,0])
     
-    def draw_on_cam_img(self, img, cam):
-        xs = np.linspace(0.1, 0.7, 20)
-        ys = self.get_y(xs)
+    def draw_on_cam_img(self, img, cam, l0=0.1, l1=0.7):
+        xs = np.linspace(l0, l1, 20); ys = self.get_y(xs)
         pts_world = np.array([[x, y, 0] for x, y in zip(xs, ys)])
         pts_img = cam.project(pts_world)
         for i in range(len(pts_img)-1):
-            cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), (0,128,0), 4)
+            try:
+                cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), (0,128,0), 4)
+            except OverflowError:
+                pass
 
 class LaneModelPublisher:
     def __init__(self, topic='follow_line/detected_lane_model'):
@@ -68,9 +75,9 @@ class LaneModelMarkerPublisher:
         c = self.lane_msg.color; c.a, c.r, c.g, c.b = color
         o = self.lane_msg.pose.orientation; o.x, o.y, o.z, o.w = 0, 0, 0, 1
 
-    def publish(self, lm, lookahead=0.7):
-        pts = [[0, 0, 0], [0.1, 0, 0], [0.2, 0.1, 0]]
-        pts = [[x, lm.get_y(x), 0] for x in np.linspace(0, lookahead, 10)]
+    def publish(self, lm, l0=0.6, l1=1.8):
+        #pts = [[0, 0, 0], [0.1, 0, 0], [0.2, 0.1, 0]]
+        pts = [[x, lm.get_y(x), 0] for x in np.linspace(l0, l1, 10)]
         self.lane_msg.points = []
         for p in pts:
             _p = geometry_msgs.msg.Point()
