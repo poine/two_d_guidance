@@ -88,7 +88,7 @@ class Node:
         msg_class, _msg_topic, _unused = rostopic.get_topic_class(self.robot_pose_topic, blocking=True)
         if msg_class == geometry_msgs.msg.PoseWithCovarianceStamped:
             print 'using geometry_msgs.msg.PoseWithCovarianceStamped for robot location'
-            self.robot_listener = ros_utils.SmocapListener()
+            self.robot_listener = ros_utils.SmocapListener(topic=self.robot_pose_topic)
         elif msg_class == nav_msgs.msg.Odometry:
             print 'using nav_msgs.msg.Odometry for robot location'
             self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic)
