@@ -10,8 +10,8 @@ class RobotLostException(Exception):
     pass
 
 class SmocapListener:
-    def __init__(self):
-        rospy.Subscriber('/smocap/est_marker', geometry_msgs.msg.PoseWithCovarianceStamped, self.smocap_cbk)
+    def __init__(self, topic='/smocap/est_marker'):
+        rospy.Subscriber(topic, geometry_msgs.msg.PoseWithCovarianceStamped, self.smocap_cbk)
         self.ts = None
         self.pose = None
         self.vel = None
