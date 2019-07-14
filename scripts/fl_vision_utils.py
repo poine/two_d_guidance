@@ -121,8 +121,8 @@ def region_of_interest_vertices(height, width, dh=0.25):
 
 
 class BinaryThresholder:
-    def __init__(self):
-        self.thresh_val = 130#196
+    def __init__(self, thresh=196):
+        self.thresh_val = thresh#130#196
         self.threshold = None
         
     def process(self, img):
@@ -131,6 +131,9 @@ class BinaryThresholder:
         ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
         return self.threshold
 
+    def set_threshold(self, thresh): self.thresh_val = thresh
+
+    
 class ContourFinder:
     def __init__(self):
         self.img = None

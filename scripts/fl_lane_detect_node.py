@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, numpy as np, rospy, sensor_msgs.msg, visualization_msgs.msg, geometry_msgs.msg
+import sys, numpy as np, rospy,  dynamic_reconfigure.server, sensor_msgs.msg, visualization_msgs.msg, geometry_msgs.msg
 import cv2, cv_bridge
 
 import pdb
@@ -8,6 +8,8 @@ import pdb
 #import smocap
 import smocap.rospy_utils
 import fl_vision_utils as flvu, fl_utils as flu
+
+import two_d_guidance.cfg.fl_lane_detectorConfig
 
 class ImgPublisher:
     def __init__(self, cam_sys):
@@ -110,11 +112,23 @@ class Node:
         self.lane_model_pub = flu.LaneModelPublisher()
         self.lane_model = flu.LaneModel()
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_lane_detectorConfig, self.cfg_callback)
 
+    def cfg_callback(self, config, level):
+        rospy.loginfo("  Reconfigure Request:")
+        #pdb.set_trace()
+        print config, level
+        #rospy.loginfo("  Reconfigure Request: {int_param}, {lookahead}, {str_param}, {bool_param}, {size}".format(**config))
+        #self.guidance.lookahead = config['lookahead']
+        self.pipeline.thresholder.set_threshold(config['mask_threshold'])
+        self.pipeline.display_mode = config['display_mode']
+        return config
+
+    
     def on_image(self, img, (cam_idx, stamp, seq)):
         #pdb.set_trace()
         #self.lane_finder.process_rgb_image(img, self.cam_sys.cameras[cam_idx])
-        print(img.dtype)
+        #print(img.dtype)
         self.pipeline.process_image(img, self.cam_sys.cameras[cam_idx])
         if self.pipeline.lane_model.is_valid():
             self.lane_model_pub.publish(self.pipeline.lane_model)

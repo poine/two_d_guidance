@@ -104,7 +104,7 @@ class Node:
 
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
-        if self.guidance.mode == Guidance.mode_driving:
+        if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
             lin, ang =  self.guidance.compute(self.lane_model, lin=0.2, expl_noise=0.)
         else:
             lin, ang = 0, 0

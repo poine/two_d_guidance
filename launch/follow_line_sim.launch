@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="start_gazebo" default="true" />
-  <arg name="start_filter" default="true" />
+  <arg name="start_filter" default="false" />
   <arg name="start_teleop" default="true" />
   <arg name="start_fl_lane_detect" default="true" />
   <arg name="start_fl_fake_lane_detect" default="false" />
@@ -9,7 +9,7 @@
   <arg name="start_viz" default="true" />
   
   <arg name="world_name" default="$(find common_simulations)/worlds/track_trr.world" />
-  <arg name="robot_type" default="roverboard" />
+  <arg name="robot_type" default="roverboard" /> <!-- also works with nono -->
   <arg name="robot_name" default="pierrette" />
 
   <arg name="filter_use_gz_truth" default="true"/>
@@ -55,7 +55,7 @@
   <!--  ****** Lane detection *****  -->
   <group if="$(arg start_fl_lane_detect)">
     <node name="follow_line_lane_detector" pkg="two_d_guidance" type="fl_lane_detect_node.py">
-      <param name="cameras" value="$(arg robot_name)/camera1"/>
+      <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
     </node>
   </group>
@@ -78,7 +78,7 @@
   
   <!--  ****** Viz *****  -->
   <group if="$(arg start_viz)">
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find two_d_guidance)/rviz/follow_line_$(arg robot_name).rviz" />
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find two_d_guidance)/rviz/follow_line_$(arg robot_name)_sim.rviz" />
   </group>
 
  

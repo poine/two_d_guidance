@@ -52,13 +52,18 @@ class LaneModelSubscriber:
         self.sub = rospy.Subscriber(topic, two_d_guidance.msg.LaneModel, self.msg_callback, queue_size=1)
         rospy.loginfo(' subscribed to ({})'.format(topic))
         self.msg = None
+        self.timeout = 0.5
         
     def msg_callback(self, msg):
         self.msg = msg
+        self.last_msg_time = rospy.get_rostime()
 
     def get(self, lm):
-        if self.msg is not None:
+        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
             lm.coefs = self.msg.poly
+            lm.set_valid(True)
+        else:
+            lm.set_valid(False)
 
 class LaneModelMarkerPublisher:
     def __init__(self, ref_frame="nono_0/base_link_footprint", topic='/follow_line/detected_lane',
@@ -77,6 +82,9 @@ class LaneModelMarkerPublisher:
 
     def publish(self, lm, l0=0.6, l1=1.8):
         #pts = [[0, 0, 0], [0.1, 0, 0], [0.2, 0.1, 0]]
+        try:
+            l0, l1 = lm.x_min, lm.x_max
+        except AttributeError: pass
         pts = [[x, lm.get_y(x), 0] for x in np.linspace(l0, l1, 10)]
         self.lane_msg.points = []
         for p in pts:

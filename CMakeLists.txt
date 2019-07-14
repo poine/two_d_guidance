@@ -91,6 +91,7 @@ generate_messages(
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
  generate_dynamic_reconfigure_options(
     cfg/fl_guidance.cfg
+    cfg/fl_lane_detector.cfg
 #   cfg/DynReconf1.cfg
 #   cfg/DynReconf2.cfg
  )
