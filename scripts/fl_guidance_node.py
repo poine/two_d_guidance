@@ -60,8 +60,9 @@ class Publisher:
         
 class Guidance:
     mode_idle, mode_driving, mode_nb = range(3)
-    def __init__(self, lookahead=0.4):
+    def __init__(self, lookahead=0.4, vel_sp=0.2):
         self.lookahead = lookahead
+        self.vel_sp = vel_sp
         self.mode =  Guidance.mode_idle
         self.carrot = [lookahead, 0]
         self.R = np.inf
@@ -92,8 +93,10 @@ class Node:
         self.guidance.mode = Guidance.mode_driving
 
     def cfg_callback(self, config, level):
-        rospy.loginfo("  Reconfigure Request: {int_param}, {lookahead}, {str_param}, {bool_param}, {size}".format(**config))
+        rospy.loginfo("  Reconfigure Request: {lookahead}, {guidance_mode}".format(**config))
         self.guidance.lookahead = config['lookahead']
+        self.guidance.mode = config['guidance_mode']
+        self.guidance.vel_sp = config['vel_sp']
         return config
 
         
@@ -105,7 +108,7 @@ class Node:
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
         if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
-            lin, ang =  self.guidance.compute(self.lane_model, lin=0.2, expl_noise=0.)
+            lin, ang =  self.guidance.compute(self.lane_model, lin=self.guidance.vel_sp, expl_noise=0.)
         else:
             lin, ang = 0, 0
         self.publisher.publish_cmd(lin, ang)

@@ -13,10 +13,14 @@ import two_d_guidance.cfg.fl_lane_detectorConfig
 
 class ImgPublisher:
     def __init__(self, cam_sys):
+        self.publish_compressed = True
         img_topic = "/follow_line/image_debug"
         rospy.loginfo(' publishing image on ({})'.format(img_topic))
-        self.image_pub = rospy.Publisher(img_topic, sensor_msgs.msg.Image, queue_size=1)
-        self.bridge = cv_bridge.CvBridge()
+        if self.publish_compressed:
+            self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
+        else:
+            self.image_pub = rospy.Publisher(img_topic, sensor_msgs.msg.Image, queue_size=1)
+            self.bridge = cv_bridge.CvBridge()
         self.cam_sys = cam_sys
         w, h = np.sum([cam.w for cam in  cam_sys.get_cameras()]), np.max([cam.h for cam in cam_sys.get_cameras()])
         self.img = 255*np.ones((h, w, 3), dtype='uint8')
@@ -28,8 +32,14 @@ class ImgPublisher:
                 h, w = img.shape[0], img.shape[1]; x1 = x0+w
                 self.img[:h,x0:x1] = pipeline.draw_debug(cam, img)
                 x0 = x1
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.img, "rgb8"))
-
+        if self.publish_compressed:
+            msg = sensor_msgs.msg.CompressedImage()
+            msg.header.stamp = rospy.Time.now()
+            msg.format = "jpeg"
+            msg.data = np.array(cv2.imencode('.jpg', self.img)[1]).tostring()
+            self.image_pub.publish(msg)
+        else:
+            self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.img, "rgb8"))
 
 class ContourPublisher:
     def __init__(self, frame_id='nono_0/base_link_footprint', topic='/follow_line/detected_contour',
@@ -83,7 +93,7 @@ class BirdEyePublisher(ContourPublisher):
 class Node:
 
     def __init__(self):
-        self.low_freq = 15.
+        self.low_freq = 10.
         robot_name = rospy.get_param('~robot_name', '')
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
         cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera1')).split(',')
@@ -97,8 +107,8 @@ class Node:
             self.cam_sys.cameras[0].set_location(world_to_camo_t, world_to_camo_q)
         self.cam_sys.cameras[0].set_undistortion_param(alpha=1.)
             
-        #self.pipeline = flvu.Contour1Pipeline(self.cam_sys.cameras[0])
-        self.pipeline = flvu.Contour2Pipeline(self.cam_sys.cameras[0], flvu.CarolineBirdEyeParam()); self.pipeline.display_mode = flvu.Contour2Pipeline.show_be
+        self.pipeline = flvu.Contour1Pipeline(self.cam_sys.cameras[0])
+        #self.pipeline = flvu.Contour2Pipeline(self.cam_sys.cameras[0], flvu.CarolineBirdEyeParam()); self.pipeline.display_mode = flvu.Contour2Pipeline.show_be
         #self.pipeline = flvu.Foo3Pipeline(self.cam_sys.cameras[0])
         self.img_pub = ImgPublisher(self.cam_sys)
         self.cont_pub = ContourPublisher(frame_id=ref_frame)
@@ -119,7 +129,6 @@ class Node:
         #pdb.set_trace()
         print config, level
         #rospy.loginfo("  Reconfigure Request: {int_param}, {lookahead}, {str_param}, {bool_param}, {size}".format(**config))
-        #self.guidance.lookahead = config['lookahead']
         self.pipeline.thresholder.set_threshold(config['mask_threshold'])
         self.pipeline.display_mode = config['display_mode']
         return config

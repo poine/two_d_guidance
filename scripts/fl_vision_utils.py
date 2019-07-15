@@ -202,6 +202,7 @@ class Contour1Pipeline:
         self.contour_finder = ContourFinder()
         self.floor_plane_injector = FloorPlaneInjector()
         self.lane_model = flu.LaneModel()
+        self.display_mode = 0
 
     def process_image(self, img, cam):
         self.img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -232,6 +233,7 @@ class Contour2Pipeline:
          
     def process_image(self, img, cam):
         undistorted_img = cam.undistort_img(img) # costly (0.05s)
+        #undistorted_img = img
         # Project image to Bird Eye view
         self.bird_eye.process(undistorted_img)
         # Compute grayscale threshold
