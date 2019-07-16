@@ -196,17 +196,36 @@ class FloorPlaneInjector:
 
 
 class Pipeline:
-
-    def process_image(self, img, cam):
+    def __init__(self):
+        self.skipped_frames = 0
+        self.last_seq = None
+        self.last_stamp = None
+        self.real_fps = 0.
+        
+    def process_image(self, img, cam, stamp, seq):
+        if self.last_stamp is not None:
+            self.real_fps = 1./(stamp - self.last_stamp).to_sec()
+        self.last_stamp = stamp
+        if self.last_seq is not None:
+            self.skipped_frames += seq-self.last_seq-1
+        self.last_seq = seq
         _start = time.time()
         self._process_image(img, cam)
         _end = time.time()
-        self.last_duration = _end-_start
+        self.last_processing_duration = _end-_start
+
+    def draw_timing(self, img):
+        cv2.putText(img, 'fps: {:.1f}'.format(self.real_fps), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        cv2.putText(img, 'skipped: {:d}'.format(self.skipped_frames), (20, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        try: cv2.putText(img, 'proc fps: {:.1f}'.format(1./self.last_processing_duration), (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        except AttributeError: pass
+        
         
         
 class Contour1Pipeline(Pipeline):
     
     def __init__(self, cam):
+        Pipeline.__init__(self)
         self.thresholder = BinaryThresholder()
         self.contour_finder = ContourFinder()
         self.floor_plane_injector = FloorPlaneInjector()
@@ -214,8 +233,9 @@ class Contour1Pipeline(Pipeline):
         self.display_mode = 0
 
     def _process_image(self, img, cam):
-        self.img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        self.thresholder.process(self.img)
+        self.img = img
+        self.img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        self.thresholder.process(self.img_gray)
         self.contour_finder.process(self.thresholder.threshold)
         if self.contour_finder.cnt_be is not None:
             self.floor_plane_injector.compute(self.contour_finder.cnt_be, cam)
@@ -225,7 +245,8 @@ class Contour1Pipeline(Pipeline):
             self.lane_model.set_valid(False)
         
     def draw_debug(self, cam, img_cam=None):
-        out_img = cv2.cvtColor(self.img, cv2.COLOR_GRAY2BGR)
+        out_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
+        self.draw_timing(out_img)
         self.contour_finder.draw(out_img)
         if self.lane_model.is_valid():
             self.lane_model.draw_on_cam_img(out_img, cam)

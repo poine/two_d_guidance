@@ -136,9 +136,8 @@ class Node:
     
     def on_image(self, img, (cam_idx, stamp, seq)):
         #pdb.set_trace()
-        #self.lane_finder.process_rgb_image(img, self.cam_sys.cameras[cam_idx])
         #print(img.dtype)
-        self.pipeline.process_image(img, self.cam_sys.cameras[cam_idx])
+        self.pipeline.process_image(img, self.cam_sys.cameras[cam_idx], stamp, seq)
         if self.pipeline.lane_model.is_valid():
             self.lane_model_pub.publish(self.pipeline.lane_model)
             
@@ -146,11 +145,7 @@ class Node:
         self.img_pub.publish(self.cam_lst.get_images_as_rgb(), self.pipeline)
 
     def publish_3Dmarkers(self):
-        #if self.lane_finder.c1pipe.floor_plane_injector.contour_floor_plane_blf is not None:
-        #    self.cont_pub.publish(self.lane_finder.c1pipe.floor_plane_injector.contour_floor_plane_blf)
-        #if self.lane_finder.c2pipe.bird_eye.cnt_fp is not None:
-        #    self.cont2_pub.publish(self.lane_finder.c2pipe.bird_eye.cnt_fp)
-        self.fov_pub.publish()
+        #self.fov_pub.publish()
         if self.be_pub is not None:
             self.be_pub.publish()
             if self.pipeline.bird_eye.cnt_fp is not None:
