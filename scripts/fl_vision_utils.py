@@ -68,8 +68,8 @@ class BirdEyeTransformer:
 
     def draw_debug(self, cam, img=None, lane_model=None, border_color=0.4):
         if img is None: img = self.unwarped_img
-        #if img.dtype == np.uint8:
-        #    img = img.astype(np.float32)/255.
+        if img.dtype == np.uint8:
+            img = img.astype(np.float32)/255.
         out_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.float32)
         scale = min(float(cam.h)/self.h, float(cam.w)/self.w)
         h, w = int(scale*self.h), int(scale*self.w)
@@ -195,7 +195,16 @@ class FloorPlaneInjector:
         self.contour_floor_plane_blf = np.array([np.dot(cam.cam_to_world_T[:3], p.tolist()+[1]) for p in contour_floor_plane_cam])
 
 
-class Contour1Pipeline:
+class Pipeline:
+
+    def process_image(self, img, cam):
+        _start = time.time()
+        self._process_image(img, cam)
+        _end = time.time()
+        self.last_duration = _end-_start
+        
+        
+class Contour1Pipeline(Pipeline):
     
     def __init__(self, cam):
         self.thresholder = BinaryThresholder()
@@ -204,7 +213,7 @@ class Contour1Pipeline:
         self.lane_model = flu.LaneModel()
         self.display_mode = 0
 
-    def process_image(self, img, cam):
+    def _process_image(self, img, cam):
         self.img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         self.thresholder.process(self.img)
         self.contour_finder.process(self.thresholder.threshold)
@@ -222,7 +231,7 @@ class Contour1Pipeline:
             self.lane_model.draw_on_cam_img(out_img, cam)
         return out_img
         
-class Contour2Pipeline:
+class Contour2Pipeline(Pipeline):
     show_be, show_thresh, show_contour = range(3)
     def __init__(self, cam, be_param=BirdEyeParam()):
         self.bird_eye = BirdEyeTransformer(cam, be_param)
@@ -231,7 +240,7 @@ class Contour2Pipeline:
         self.lane_model = flu.LaneModel()
         self.display_mode = Contour2Pipeline.show_be
          
-    def process_image(self, img, cam):
+    def _process_image(self, img, cam):
         undistorted_img = cam.undistort_img(img) # costly (0.05s)
         #undistorted_img = img
         # Project image to Bird Eye view
@@ -268,13 +277,13 @@ class Contour2Pipeline:
             return self.bird_eye.draw_debug(cam, img, self.lane_model)
 
 
-class Foo3Pipeline:
-    def __init__(self, cam):
-        self.bird_eye = BirdEyeTransformer(cam, BirdEyeParam())
+class Foo3Pipeline(Pipeline):
+    def __init__(self, cam, be_param=BirdEyeParam()):
+        self.bird_eye = BirdEyeTransformer(cam, be_param)
         self.lane_model = flu.LaneModel()
         self.undistorted_img = None
         
-    def process_image(self, img, cam):
+    def _process_image(self, img, cam):
         self.undistorted_img = cam.undistort_img(img)
         self.bird_eye.process(self.undistorted_img)
         self.edges = cv2.Canny(self.bird_eye.unwarped_img, 100, 200)
@@ -282,10 +291,10 @@ class Foo3Pipeline:
     def draw_debug(self, cam, img_cam=None):
         if 0: img_out = img_cam
         if 0: img_out = self.undistorted_img if self.undistorted_img is not None else np.zeros((cam.h, cam.w, 3))
-        if 1: img_out = self.bird_eye.draw_debug(cam, self.bird_eye.unwarped_img)
-        if 0: img_out = self.bird_eye.draw_debug(cam, cv2.cvtColor(self.edges, cv2.COLOR_GRAY2BGR))
-        if self.undistorted_img is not None:
-            print(self.undistorted_img.dtype, self.bird_eye.unwarped_img.dtype)
+        if 0: img_out = self.bird_eye.draw_debug(cam, self.bird_eye.unwarped_img)
+        if 1: img_out = self.bird_eye.draw_debug(cam, cv2.cvtColor(self.edges, cv2.COLOR_GRAY2BGR))
+        #if self.undistorted_img is not None:
+        #    print(self.undistorted_img.dtype, self.bird_eye.unwarped_img.dtype)
         return img_out
 
     
