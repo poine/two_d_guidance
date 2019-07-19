@@ -93,7 +93,7 @@ class Node:
         self.guidance.mode = Guidance.mode_driving
 
     def cfg_callback(self, config, level):
-        rospy.loginfo("  Reconfigure Request: {lookahead}, {guidance_mode}".format(**config))
+        rospy.loginfo("  Reconfigure Request: {lookahead}, {guidance_mode}, {vel_sp}".format(**config))
         self.guidance.lookahead = config['lookahead']
         self.guidance.mode = config['guidance_mode']
         self.guidance.vel_sp = config['vel_sp']
