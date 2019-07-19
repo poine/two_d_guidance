@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os, sys
-import numpy as np
+import math, numpy as np
 import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg, visualization_msgs.msg
 
@@ -41,8 +41,8 @@ class Publisher:
         alpha = np.arctan(carrot_pos[0]/(R - carrot_pos[1]))
         for theta in np.linspace(0, alpha, 20):
             pose = geometry_msgs.msg.PoseStamped()
-            pose.pose.position.x =  R*np.sin(theta)
-            pose.pose.position.y = -R*np.cos(theta)+R
+            pose.pose.position.x =  R*np.sin(theta)   if not math.isinf(R) else 0
+            pose.pose.position.y = -R*np.cos(theta)+R if not math.isinf(R) else 0
             self.arc_msg.poses.append(pose)
         self.pub_arc.publish(self.arc_msg)
 
@@ -61,9 +61,9 @@ class Publisher:
 class Guidance:
     mode_idle, mode_driving, mode_nb = range(3)
     def __init__(self, lookahead=0.4, vel_sp=0.2):
+        self.set_mode(Guidance.mode_idle)
         self.lookahead = lookahead
         self.vel_sp = vel_sp
-        self.mode =  Guidance.mode_idle
         self.carrot = [lookahead, 0]
         self.R = np.inf
     
@@ -74,6 +74,9 @@ class Guidance:
         ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
         return lin, ang
 
+    def set_mode(self, mode):
+        rospy.loginfo('guidance setting mode to {}'.format(mode))
+        self.mode = mode
     
 import pdb
 
@@ -81,29 +84,27 @@ import pdb
 class Node:
 
     def __init__(self):
+        rospy.loginfo("fl_guidance_node Starting")
         self.low_freq = 10
-        #self.fake_line_detector = flu.FakeLineDetector()
-        #self.real_line_finder = fln.Node()
         self.lane_model_sub = flu.LaneModelSubscriber()
         self.lane_model = flu.LaneModel()
         self.guidance = Guidance(lookahead=0.6)
         self.publisher = Publisher()
-        self.set_mode_svc = rospy.Service('set_mode', two_d_guidance.srv.SetMode, self.handle_set_mode)
+        #self.set_mode_svc = rospy.Service('set_mode', two_d_guidance.srv.SetMode, self.handle_set_mode)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_guidanceConfig, self.cfg_callback)
-        self.guidance.mode = Guidance.mode_driving
 
     def cfg_callback(self, config, level):
-        rospy.loginfo("  Reconfigure Request: {lookahead}, {guidance_mode}, {vel_sp}".format(**config))
+        rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead}, vel_setpoint: {vel_sp}".format(**config))
+        self.guidance.set_mode(config['guidance_mode'])
         self.guidance.lookahead = config['lookahead']
-        self.guidance.mode = config['guidance_mode']
         self.guidance.vel_sp = config['vel_sp']
         return config
 
         
-    def handle_set_mode(self, req):
-        print("Setting mode to {}".format(req.a))
-        self.guidance.mode = req.a
-        return two_d_guidance.srv.SetModeResponse(42)
+    # def handle_set_mode(self, req):
+    #     print("Setting mode to {}".format(req.a))
+    #     self.guidance.mode = req.a
+    #     return two_d_guidance.srv.SetModeResponse(42)
 
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
