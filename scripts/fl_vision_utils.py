@@ -255,6 +255,7 @@ class Contour1Pipeline(Pipeline):
 class Contour2Pipeline(Pipeline):
     show_be, show_thresh, show_contour = range(3)
     def __init__(self, cam, be_param=BirdEyeParam()):
+        Pipeline.__init__(self)
         self.bird_eye = BirdEyeTransformer(cam, be_param)
         self.thresholder = BinaryThresholder()
         self.contour_finder = ContourFinder()

@@ -18,13 +18,14 @@ def test_on_bag(pipe, cam, bag_path, img_topic='/camera1/image_raw' ):
     bag, bridge = rosbag.Bag(bag_path, "r"), cv_bridge.CvBridge()
     durations = []
     for topic, msg, t in bag.read_messages(topics=[img_topic]):
+        #cv_img = bridge.imgmsg_to_cv2(msg, "rgb8")
         cv_img = bridge.imgmsg_to_cv2(msg, "bgr8")
         #print cv_img.dtype
         #if cv_img.dtype == np.uint8:
         #    cv_img = cv_img.astype(np.float32)/255.
-        pipe.process_image(cv_img, cam)
-        durations.append(pipe.last_duration)
-        print('{:.3f}s ({:.1f}hz)'.format(pipe.last_duration, 1./pipe.last_duration ))
+        pipe.process_image(cv_img, cam, msg.header.stamp, msg.header.seq)
+        durations.append(pipe.last_processing_duration)
+        print('{:.3f}s ({:.1f}hz)'.format(pipe.last_processing_duration, 1./pipe.last_processing_duration ))
         out_img = pipe.draw_debug(cam)
         cv2.imshow('out', out_img)
         cv2.waitKey(10)
@@ -44,7 +45,7 @@ if __name__ == '__main__':
     cam = flvu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
 
     pipe_1, pipe_2, pipe_3 = range(3)
-    pipe_type = pipe_1
+    pipe_type = pipe_2
     if pipe_type == pipe_1:
         pipe = flvu.Contour1Pipeline(cam)
         pipe.thresholder.set_threshold(110)
