@@ -107,9 +107,13 @@ class Node:
             self.cam_sys.cameras[0].set_location(world_to_camo_t, world_to_camo_q)
         self.cam_sys.cameras[0].set_undistortion_param(alpha=1.)
             
-        self.pipeline = flvu.Contour1Pipeline(self.cam_sys.cameras[0])
-        #self.pipeline = flvu.Contour2Pipeline(self.cam_sys.cameras[0], flvu.CarolineBirdEyeParam()); self.pipeline.display_mode = flvu.Contour2Pipeline.show_be
-        #self.pipeline = flvu.Foo3Pipeline(self.cam_sys.cameras[0])
+        pipe=1
+        if pipe == 1: self.pipeline = flvu.Contour1Pipeline(self.cam_sys.cameras[0])
+        elif pipe == 2:
+            self.pipeline = flvu.Contour2Pipeline(self.cam_sys.cameras[0], flvu.CarolineBirdEyeParam())
+            self.pipeline.display_mode = flvu.Contour2Pipeline.show_be
+        elif pipe == 3:
+            self.pipeline = flvu.Foo3Pipeline(self.cam_sys.cameras[0])
         self.img_pub = ImgPublisher(self.cam_sys)
         self.cont_pub = ContourPublisher(frame_id=ref_frame)
         self.cont2_pub = ContourPublisher(frame_id=ref_frame, topic='/follow_line/detected_contour2', rgba=(1.,0.,1.,1.))

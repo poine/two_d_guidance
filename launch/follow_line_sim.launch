@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="start_gazebo" default="true" />
+  <arg name="start_gazebo_gui" default="true" />
   <arg name="start_filter" default="false" />
   <arg name="start_teleop" default="true" />
   <arg name="start_fl_lane_detect" default="true" />
@@ -10,7 +11,7 @@
   
   <arg name="world_name" default="$(find common_simulations)/worlds/track_trr.world" />
   <arg name="robot_type" default="roverboard" /> <!-- also works with nono -->
-  <arg name="robot_name" default="pierrette" />
+  <arg name="robot_name" default="caroline" />
 
   <arg name="filter_use_gz_truth" default="true"/>
   <arg name="robot_marker" default="0" />
@@ -23,6 +24,7 @@
   <group if="$(arg start_gazebo)">
     <include file="$(eval find(arg('sim_pkg')) + '/launch/empty_world.launch')">	
       <arg name="start_gazebo" value="$(arg start_gazebo)" />
+      <arg name="gz_gui" value="$(arg start_gazebo_gui)" />
       <arg name="world_name" value="$(arg world_name)" />
       <arg name="robot_name" value="$(arg robot_name)" />
       <arg name="robot_initial_xy" value="-x -0.3 -y 1.75"/>
@@ -40,7 +42,7 @@
           args="0 0 0  0 0 0 world map 100"/>*
   </group>
 
-  <!-- Fix gazebo not doing frames namespacing -->
+  <!-- ****** Fix gazebo not doing frames namespacing ***** -->
   <node name="gazebo_truth_fix" pkg="common_simulations" type="fix_gazebo_truth.py">
     <param name="robot_name"   value="$(arg robot_name)" />
   </node>

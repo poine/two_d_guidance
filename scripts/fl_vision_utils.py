@@ -215,15 +215,16 @@ class Pipeline:
         self.last_processing_duration = _end-_start
 
     def draw_timing(self, img):
-        cv2.putText(img, 'fps: {:.1f}'.format(self.real_fps), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
-        cv2.putText(img, 'skipped: {:d}'.format(self.skipped_frames), (20, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
-        try: cv2.putText(img, 'proc fps: {:.1f}'.format(1./self.last_processing_duration), (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (0, 255, 0), 2
+        cv2.putText(img, 'fps: {:.1f}'.format(self.real_fps), (20, 40), f, h, c, w)
+        cv2.putText(img, 'skipped: {:d}'.format(self.skipped_frames), (20, 90), f, h, c, w)
+        try: cv2.putText(img, 'proc fps: {:.1f}'.format(1./self.last_processing_duration), (20, 140), f, h, c, w)
         except AttributeError: pass
         
         
         
 class Contour1Pipeline(Pipeline):
-    
+    show_be, show_thresh, show_contour = range(3)
     def __init__(self, cam):
         Pipeline.__init__(self)
         self.thresholder = BinaryThresholder()
@@ -231,7 +232,8 @@ class Contour1Pipeline(Pipeline):
         self.floor_plane_injector = FloorPlaneInjector()
         self.lane_model = flu.LaneModel()
         self.display_mode = 0
-
+        self.img = None
+        
     def _process_image(self, img, cam):
         self.img = img
         self.img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -245,7 +247,11 @@ class Contour1Pipeline(Pipeline):
             self.lane_model.set_valid(False)
         
     def draw_debug(self, cam, img_cam=None):
-        out_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
+        if self.img is None: return np.zeros((cam.h, cam.w, 3))
+        if self.display_mode == Contour2Pipeline.show_thresh:
+            out_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR) # cv2.COLOR_GRAY2BGR ??
+        else:
+            out_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
         self.draw_timing(out_img)
         self.contour_finder.draw(out_img)
         if self.lane_model.is_valid():

@@ -97,7 +97,7 @@ class OdomListener:
         
         
 class Guidance:
-    mode_idle, mode_driving, mode_nb = range(3)
+    mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
     def __init__(self, lookahead=0.4, vel_sp=0.2):
         self.set_mode(Guidance.mode_idle)
         self.lookahead = lookahead
@@ -129,6 +129,7 @@ class Node:
         self.high_freq = 30
         self.hf_loop_idx = 0
         self.low_freq_div = 6
+        self.lin_sp, self.ang_sp = 0,0
         self.lane_model = flu.LaneModel()
         self.guidance = Guidance(lookahead=0.6)
         self.publisher = Publisher(ref_frame)
@@ -144,7 +145,6 @@ class Node:
         self.guidance.vel_sp = config['vel_sp']
         return config
 
-        
     # def handle_set_mode(self, req):
     #     print("Setting mode to {}".format(req.a))
     #     self.guidance.mode = req.a
@@ -152,21 +152,24 @@ class Node:
 
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
-        if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
-            self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, lin=self.guidance.vel_sp, expl_noise=0.)
-        else:
-            self.lin_sp, self.ang_sp = 0, 0
-        self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
+        if self.guidance.mode != Guidance.mode_idle:
+            if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
+                self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, lin=self.guidance.vel_sp, expl_noise=0.)
+            else:
+                self.lin_sp, self.ang_sp = 0, 0
+            self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
         self.hf_loop_idx += 1
         self.low_freq()
         
     def low_freq(self):
         i = self.hf_loop_idx%self.low_freq_div
-        if i == 0: self.publisher.publish_arc(self.guidance.R, self.guidance.carrot)
-        elif i == 1: self.publisher.publish_carrot(self.guidance.carrot)
-        elif i == 2: self.publisher.img_pub.publish(self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang)
-        elif i == 3: self.publisher.publish_lane(self.lane_model)
-        elif i == 5: self.publisher.img_pub.publish(self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang)
+        steps = [ lambda : self.publisher.publish_arc(self.guidance.R, self.guidance.carrot),
+                  lambda : self.publisher.publish_carrot(self.guidance.carrot),
+                  lambda : self.publisher.img_pub.publish(self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang),
+                  lambda : self.publisher.publish_lane(self.lane_model),
+                  lambda : self.publisher.img_pub.publish(self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang),
+                  lambda : None ]
+        steps[i]()
         
     def run(self):
         rate = rospy.Rate(self.high_freq)

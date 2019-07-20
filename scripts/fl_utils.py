@@ -98,7 +98,7 @@ class FakeLineDetector:
     # compute a fake detected line from path and localization
     def __init__(self):
         tdg_dir = rospkg.RosPack().get_path('two_d_guidance')
-        default_path_filename = os.path.join(tdg_dir, 'paths/demo_z/track_trr.npz')
+        default_path_filename = os.path.join(tdg_dir, 'paths/demo_z/track_trr_real.npz')
         path_filename = rospy.get_param('~path_filename', default_path_filename)
 
         rospy.loginfo(' loading path: {}'.format(path_filename))
