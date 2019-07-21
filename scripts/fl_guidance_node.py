@@ -71,9 +71,9 @@ class ImgPublisher:
         # store subscribed image (bgr, opencv)
         self.img = img
     
-    def publish(self, lin_sp, lin_odom, ang_sp, ang_odom):
+    def publish(self, mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model):
         if self.img is not None:
-            self.draw(lin_sp, lin_odom, ang_sp, ang_odom)
+            self.draw(mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model)
             img_rgb = self.img[...,::-1] # rgb = bgr[...,::-1] OpenCV image to Matplotlib
             msg = sensor_msgs.msg.CompressedImage()
             msg.header.stamp = rospy.Time.now()
@@ -81,9 +81,11 @@ class ImgPublisher:
             msg.data = np.array(cv2.imencode('.jpg', img_rgb)[1]).tostring()
             self.image_pub.publish(msg)
 
-    def draw(self, lin_sp, lin_odom, ang_sp, ang_odom):
-        cv2.putText(self.img, 'lin:  sp/odom {:.2f}/{:.2f} m/s'.format(lin_sp, lin_odom), (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1., (0, 255, 0), 2)
-        cv2.putText(self.img, 'ang: sp/odom {: 6.2f}/{: 6.2f} deg/s'.format(np.rad2deg(ang_sp), np.rad2deg(ang_odom)), (20, 90), cv2.FONT_HERSHEY_SIMPLEX, 1., (0, 255, 0), 2)
+    def draw(self, mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model):
+        f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1., (0, 255, 0), 2
+        cv2.putText(self.img, 'mode:  {:d} curv: {: 6.2f}'.format(mode, lane_model.coefs[1]), (20, 40), f, h, c, w)
+        cv2.putText(self.img, 'lin:  sp/odom {:.2f}/{:.2f} m/s'.format(lin_sp, lin_odom), (20, 90), f, h, c, w)
+        cv2.putText(self.img, 'ang: sp/odom {: 6.2f}/{: 6.2f} deg/s'.format(np.rad2deg(ang_sp), np.rad2deg(ang_odom)), (20, 140), f, h, c, w)
 
 
 class OdomListener:
@@ -95,17 +97,34 @@ class OdomListener:
         self.msg = msg
         self.lin, self.ang = msg.twist.twist.linear.x, msg.twist.twist.angular.z
         
+
+class VelCtl:
+    mode_cst, mode_curv, mode_nb = range(3)
+    def __init__(self):
+        self.mode = VelCtl.mode_cst#VelCtl.mode_curv#
+        self.sp = 1.
+        self.min_sp = 0.2
+        self.k_curv = 0.5
+
+    def get(self, lane_model):
+        if self.mode == VelCtl.mode_cst:
+            return self.sp
+        else:
+            curv = lane_model.coefs[1]
+            return max(self.min_sp, self.sp-np.abs(curv)*self.k_curv)
         
 class Guidance:
     mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
     def __init__(self, lookahead=0.4, vel_sp=0.2):
         self.set_mode(Guidance.mode_idle)
         self.lookahead = lookahead
-        self.vel_sp = vel_sp
         self.carrot = [lookahead, 0]
         self.R = np.inf
+        self.vel_ctl = VelCtl()
+        self.vel_sp = vel_sp
     
-    def compute(self, lane_model, lin=0.25, expl_noise=0.025):
+    def compute(self, lane_model, expl_noise=0.025):
+        lin = self.vel_ctl.get(lane_model)
         self.carrot = [self.lookahead, lane_model.get_y(self.lookahead)]
         self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
         lin, ang = lin, lin/self.R
@@ -142,7 +161,9 @@ class Node:
         rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead}, vel_setpoint: {vel_sp}".format(**config))
         self.guidance.set_mode(config['guidance_mode'])
         self.guidance.lookahead = config['lookahead']
-        self.guidance.vel_sp = config['vel_sp']
+        self.guidance.vel_ctl.sp = config['vel_sp']
+        self.guidance.vel_ctl.k_curv = config['vel_k_curve']
+        self.guidance.vel_ctl.mode = config['vel_ctl_mode']
         return config
 
     # def handle_set_mode(self, req):
@@ -154,7 +175,7 @@ class Node:
         self.lane_model_sub.get(self.lane_model)
         if self.guidance.mode != Guidance.mode_idle:
             if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
-                self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, lin=self.guidance.vel_sp, expl_noise=0.)
+                self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, expl_noise=0.)
             else:
                 self.lin_sp, self.ang_sp = 0, 0
             self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
@@ -165,9 +186,9 @@ class Node:
         i = self.hf_loop_idx%self.low_freq_div
         steps = [ lambda : self.publisher.publish_arc(self.guidance.R, self.guidance.carrot),
                   lambda : self.publisher.publish_carrot(self.guidance.carrot),
-                  lambda : self.publisher.img_pub.publish(self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang),
+                  lambda : self.publisher.img_pub.publish(self.guidance.mode, self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang, self.lane_model),
                   lambda : self.publisher.publish_lane(self.lane_model),
-                  lambda : self.publisher.img_pub.publish(self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang),
+                  lambda : self.publisher.img_pub.publish(self.guidance.mode, self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang, self.lane_model),
                   lambda : None ]
         steps[i]()
         
