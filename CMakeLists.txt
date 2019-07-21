@@ -53,6 +53,7 @@ catkin_python_setup()
 add_message_files(
   FILES
   LaneModel.msg
+  FLGuidanceStatus.msg
 )
 
 ## Generate services in the 'srv' folder

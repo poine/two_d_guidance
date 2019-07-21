@@ -12,7 +12,8 @@ def run(which='line_01'):
       # figure of eight
       'fig_of_eight_01': lambda: tdg.make_fig_of_height_path2(0.7),
       # oval 
-      'oval_01': lambda: tdg.make_oval_path([-1.25, 0.], [1., 0.], 1.25),
+      'oval_01': lambda: tdg.make_oval_path([-1.25, 0.], [1., 0.], 1.5),
+      'oval_02': lambda: tdg.make_oval_path([-2.5, 0.], [2.5, 0.], 1.75),
       # line 1m 
       'line_01': lambda: tdg.make_line_path([-2, -1.8], [0., -0.8])
 
@@ -44,7 +45,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     np.set_printoptions(linewidth=300, suppress=True)
     if 1:
-       fname, p = run()
+       fname, p = run('oval_02')
        tdg.draw_path(plt.gcf(), plt.gca(), p)
        plt.show()
     else:
