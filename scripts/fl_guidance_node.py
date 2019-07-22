@@ -53,12 +53,11 @@ class Guidance:
     mode_lookahead_dist, mode_lookahead_time = range(2)
     def __init__(self, lookahead=0.4, vel_sp=0.2):
         self.set_mode(Guidance.mode_idle)
-        #self.lookahead = CstLookahead(lookahead)#lookahead
         self.lookaheads = [CstLookahead(), TimeCstLookahead()]
         self.lookahead_mode = Guidance.mode_lookahead_dist
         self.lookahead_dist = 0.1
         self.lookahead_time = 0.1
-        self.carrot = [lookahead, 0]
+        self.carrot = [self.lookahead_dist, 0]
         self.R = np.inf
         self.vel_ctl = VelCtl()
         self.vel_sp = vel_sp
@@ -164,7 +163,7 @@ class Node:
 
 
 def main(args):
-  rospy.init_node('follow_line_guidance_node')
+  rospy.init_node('trr_guidance_node')
   Node().run()
 
 
