@@ -5,7 +5,8 @@ import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg, visualization_msgs.msg, sensor_msgs.msg
 
 import two_d_guidance.msg
-import fl_utils as flu
+import two_d_guidance.trr_utils as trru
+
 import smocap.rospy_utils, cv2
 
 
@@ -24,7 +25,7 @@ class MarkerPublisher:
         self.arc_msg = nav_msgs.msg.Path()
         self.arc_msg.header.frame_id = ref_frame
 
-        self.pub_lane = flu.LaneModelMarkerPublisher(ref_frame=ref_frame, topic='trr_guidance/detected_lane_model_guidance', color=(1, 1, 0, 0))
+        self.pub_lane = trru.LaneModelMarkerPublisher(ref_frame=ref_frame, topic='trr_guidance/detected_lane_model_guidance', color=(1, 1, 0, 0))
         
         #self.img_pub = ImgPublisher()
         
@@ -118,7 +119,7 @@ class Node:
         self.mark_pub = MarkerPublisher(ref_frame)
         self.img_pub = ImgPublisher()
         self.guid_stat_sub = GuidanceStatusSubscriber()
-        self.lane_model = flu.LaneModel()
+        self.lane_model = trru.LaneModel()
         
     def periodic(self):
         m = self.guid_stat_sub.msg

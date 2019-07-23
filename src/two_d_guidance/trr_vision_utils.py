@@ -295,14 +295,18 @@ class Contour2Pipeline(Pipeline):
     def draw_debug(self, cam, img_cam=None):
         if self.img is None: return np.zeros((cam.h, cam.w, 3))
         if self.display_mode == Contour2Pipeline.show_be:
-            return self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnt_max_be.astype(np.int32))
+            img = self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnt_max_be.astype(np.int32))
+            self.draw_timing(img)
+            return img
         elif self.display_mode == Contour2Pipeline.show_thresh:
             img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
+            self.draw_timing(img)
             return img
         elif self.display_mode == Contour2Pipeline.show_contour:
             img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
             self.contour_finder.draw(img)
             if self.lane_model.is_valid(): self.lane_model.draw_on_cam_img(img, cam)
+            self.draw_timing(img)
             return img
 
 class Contour3Pipeline(Pipeline):

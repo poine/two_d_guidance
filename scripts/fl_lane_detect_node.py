@@ -7,7 +7,8 @@ import pdb
 
 #import smocap
 import smocap.rospy_utils
-import fl_vision_utils as flvu, fl_utils as flu
+
+import two_d_guidance.trr_utils as trru, two_d_guidance.trr_vision_utils as trrvu
 
 import two_d_guidance.cfg.fl_lane_detectorConfig
 
@@ -108,12 +109,12 @@ class Node:
         self.cam_sys.cameras[0].set_undistortion_param(alpha=1.)
             
         pipe=1
-        if pipe == 1: self.pipeline = flvu.Contour1Pipeline(self.cam_sys.cameras[0])
+        if pipe == 1: self.pipeline = trrvu.Contour1Pipeline(self.cam_sys.cameras[0])
         elif pipe == 2:
-            self.pipeline = flvu.Contour2Pipeline(self.cam_sys.cameras[0], flvu.CarolineBirdEyeParam())
-            self.pipeline.display_mode = flvu.Contour2Pipeline.show_be
+            self.pipeline = trrvu.Contour2Pipeline(self.cam_sys.cameras[0], trrvu.CarolineBirdEyeParam())
+            self.pipeline.display_mode = trrvu.Contour2Pipeline.show_be
         elif pipe == 3:
-            self.pipeline = flvu.Foo3Pipeline(self.cam_sys.cameras[0])
+            self.pipeline = trrvu.Foo3Pipeline(self.cam_sys.cameras[0])
         self.img_pub = ImgPublisher(self.cam_sys)
         self.cont_pub = ContourPublisher(frame_id=ref_frame)
         self.cont2_pub = ContourPublisher(frame_id=ref_frame, topic='/follow_line/detected_contour2', rgba=(1.,0.,1.,1.))
@@ -122,9 +123,9 @@ class Node:
             self.be_pub = BirdEyePublisher(ref_frame, self.pipeline.bird_eye)
         except AttributeError:
             self.be_pub = None
-        self.lane_model_marker_pub = flu.LaneModelMarkerPublisher(ref_frame=ref_frame)
-        self.lane_model_pub = flu.LaneModelPublisher()
-        self.lane_model = flu.LaneModel()
+        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher(ref_frame=ref_frame)
+        self.lane_model_pub = trru.LaneModelPublisher()
+        self.lane_model = trru.LaneModel()
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_lane_detectorConfig, self.cfg_callback)
 

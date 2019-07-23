@@ -4,7 +4,7 @@ import math, numpy as np
 import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg#, visualization_msgs.msg, sensor_msgs.msg
 
-import fl_utils as flu
+import two_d_guidance.trr_utils as trru
 import two_d_guidance.cfg.fl_guidanceConfig  # dynamic reconfigure
 
 import pdb
@@ -108,13 +108,13 @@ class Node:
         self.hf_loop_idx = 0
         self.low_freq_div = 6
         self.lin_sp, self.ang_sp = 0,0
-        self.lane_model = flu.LaneModel()
+        self.lane_model = trru.LaneModel()
         self.guidance = Guidance(lookahead=0.6)
         cmd_topic = rospy.get_param('~cmd_topic', '/nono_0/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_guidanceConfig, self.cfg_callback)
-        self.lane_model_sub = flu.LaneModelSubscriber()
+        self.lane_model_sub = trru.LaneModelSubscriber()
         self.odom_sub = OdomListener()
 
     def cfg_callback(self, config, level):

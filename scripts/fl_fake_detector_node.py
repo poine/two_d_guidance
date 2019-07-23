@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os, sys, roslib, rospy, rospkg, rostopic
 
-import fl_utils as flu
+import two_d_guidance.trr_utils as trru
 
 class Node:
 
@@ -9,10 +9,10 @@ class Node:
         self.low_freq = 20
         self.robot_name = rospy.get_param('~robot_name', "pierrette")
         self.ref_frame = rospy.get_param('~ref_frame', '{}/base_link_footprint'.format(self.robot_name))
-        self.fake_line_detector = flu.FakeLineDetector()
-        self.lane_model = flu.LaneModel()
-        self.lane_model_pub = flu.LaneModelPublisher()
-        self.lane_model_marker_pub = flu.LaneModelMarkerPublisher(ref_frame=self.ref_frame,
+        self.fake_line_detector = trru.FakeLineDetector()
+        self.lane_model = trru.LaneModel()
+        self.lane_model_pub = trru.LaneModelPublisher()
+        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher(ref_frame=self.ref_frame,
                                                                   topic='/follow_line/detected_lane_fake', color=(1., 1., 0., 0.))
         
     def periodic(self):
