@@ -4,7 +4,7 @@ import rosbag, cv_bridge
 import pdb
 
 import smocap
-import fl_vision_utils as flvu
+import two_d_guidance.trr_vision_utils as trrvu
 
 
 def test_on_img(pipe, cam, img):
@@ -42,19 +42,20 @@ if __name__ == '__main__':
     elif robot == robot_caroline:
         intr_cam_calib_path = '/home/poine/.ros/camera_info/camera_road_front.yaml'
         extr_cam_calib_path = '/home/poine/work/roverboard/roverboard_description/cfg/caroline_cam_road_front_extr.yaml'
-    cam = flvu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
+    cam = trrvu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
 
     pipe_1, pipe_2, pipe_3 = range(3)
     pipe_type = pipe_2
-    if pipe_type == pipe_1:
-        pipe = flvu.Contour1Pipeline(cam)
+    if pipe_type == pipe_1:    # 154hz
+        pipe = trrvu.Contour1Pipeline(cam)
         pipe.thresholder.set_threshold(110)
-    elif pipe_type == pipe_2:
-        pipe = flvu.Contour2Pipeline(cam, flvu.CarolineBirdEyeParam());
-        pipe.display_mode = flvu.Contour2Pipeline.show_be
+        pipe.display_mode = trrvu.Contour2Pipeline.show_thresh
+    elif pipe_type == pipe_2:  # 90hz
+        pipe = trrvu.Contour2Pipeline(cam, trrvu.CarolineBirdEyeParam());
+        pipe.display_mode = trrvu.Contour2Pipeline.show_be
         pipe.thresholder.set_threshold(110)
     elif pipe_type == pipe_3:
-        pipe = flvu.Foo3Pipeline(cam, flvu.CarolineBirdEyeParam())
+        pipe = trrvu.Foo3Pipeline(cam, trrvu.CarolineBirdEyeParam())
     mode_img, mode_bag = range(2)
     mode = mode_bag
     if mode == mode_img:

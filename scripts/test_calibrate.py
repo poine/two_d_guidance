@@ -6,7 +6,7 @@ import rospy, sensor_msgs.msg, tf.transformations
 import pdb
 
 import smocap
-import fl_vision_utils as flu
+import two_d_guidance.trr_vision_utils as trrvu
 ####
 #### started from smocap calibrate_camera_extrinsic
 #### I should have fixed it instead...
@@ -97,7 +97,8 @@ def calibrate_extrinsic(intr_cam_calib_path, extr_img_path, extr_pts_path):
     img_undistorted = cv2.undistort(img, camera_matrix, dist_coeffs, None, new_camera_matrix)
     cv2.imwrite('/tmp/foo.png', img_undistorted)
     
-    pts_name, pts_img, pts_world = flu.read_point(extr_pts_path)
+    pts_name, pts_img, pts_world = trrvu.read_point(extr_pts_path)
+    #pdb.set_trace()
     pts_img_undistorted = cv2.undistortPoints(pts_img.reshape((-1, 1, 2)), camera_matrix, dist_coeffs, None, new_camera_matrix).squeeze()
             
     (success, rotation_vector, translation_vector) = cv2.solvePnP(pts_world, pts_img.reshape(-1, 1, 2),
