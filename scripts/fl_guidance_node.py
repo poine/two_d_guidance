@@ -46,7 +46,6 @@ class TimeCstLookahead:
     def set_dist(self, _d): pass
     def set_time(self, _t): self.t = _t
     def get_dist(self, _v): return _v*self.t
-    
         
 class Guidance:
     mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
@@ -98,6 +97,7 @@ class Publisher:
         msg.lin_sp, msg.ang_sp = lin_sp, ang_sp
         self.pub.publish(msg)
 
+
 class Node:
 
     def __init__(self):
@@ -145,9 +145,9 @@ class Node:
     #     i = self.hf_loop_idx%self.low_freq_div
     #     steps = [ lambda : self.publisher.publish_arc(self.guidance.R, self.guidance.carrot),
     #               lambda : self.publisher.publish_carrot(self.guidance.carrot),
-    #               lambda : self.publisher.img_pub.publish(self.guidance.mode, self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang, self.lane_model, self.guidance.lookahead_dist),
+    #               lambda : None,
     #               lambda : self.publisher.publish_lane(self.lane_model),
-    #               lambda : self.publisher.img_pub.publish(self.guidance.mode, self.lin_sp, self.odom_sub.lin, self.ang_sp, self.odom_sub.ang, self.lane_model, self.guidance.lookahead_dist),
+    #               lambda : None,
     #               lambda : None ]
     #     steps[i]()
         
@@ -160,12 +160,9 @@ class Node:
         except rospy.exceptions.ROSInterruptException:
             pass
 
-
-
 def main(args):
   rospy.init_node('trr_guidance_node')
   Node().run()
-
 
 if __name__ == '__main__':
     main(sys.argv)

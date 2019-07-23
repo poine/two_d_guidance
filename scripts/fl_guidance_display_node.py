@@ -51,16 +51,23 @@ class ImgPublisher:
     def __init__(self, img_topic = "/trr_guidance/image_debug"):
         rospy.loginfo(' publishing image on ({})'.format(img_topic))
         self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
-        cam_names = ['caroline/camera_road_front']
+        cam_names = ['/camera_road_front'] #['caroline/camera_road_front']
         self.img = None
-        self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
+        #self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
+        self.img_sub = rospy.Subscriber("/camera_road_front/image_raw/compressed", sensor_msgs.msg.CompressedImage, self.img_cbk,  queue_size = 1)
+        self.compressed_img = None
+        
+    def img_cbk(self, msg):
+        self.compressed_img = np.fromstring(msg.data, np.uint8)
+        
         
     def on_image(self, img, (cam_idx, stamp, seq)):
         # store subscribed image (bgr, opencv)
         self.img = img
     
     def publish(self, mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model, lookahead):
-        if self.img is not None:
+        if self.compressed_img is not None:
+            self.img = cv2.cvtColor(cv2.imdecode(self.compressed_img, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
             self.draw(mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model, lookahead)
             img_rgb = self.img[...,::-1] # rgb = bgr[...,::-1] OpenCV image to Matplotlib
             msg = sensor_msgs.msg.CompressedImage()
