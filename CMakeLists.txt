@@ -13,7 +13,7 @@ add_compile_options(-Wno-psabi)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  rospy std_msgs
+  rospy std_msgs geometry_msgs
   message_generation dynamic_reconfigure)
 
 ## System dependencies are found with CMake's conventions
@@ -54,6 +54,7 @@ add_message_files(
   FILES
   LaneModel.msg
   FLGuidanceStatus.msg
+  TrrStartFinish.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -72,7 +73,7 @@ add_service_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
-  std_msgs
+  std_msgs geometry_msgs
 )
 
 ################################################
@@ -109,7 +110,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES homere_control
-  CATKIN_DEPENDS message_runtime
+  CATKIN_DEPENDS geometry_msgs std_msgs message_runtime
 #  DEPENDS message_runtime
 )
 

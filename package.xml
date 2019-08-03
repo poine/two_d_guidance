@@ -43,6 +43,8 @@
   <!--   <doc_depend>doxygen</doc_depend> -->
   <!--   <build_depend>controller_interface</build_depend> -->
   <!--   <exec_depend>controller_interface</exec_depend> -->
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
   <build_depend>message_generation</build_depend>
   <build_depend>eigen</build_depend>
   <exec_depend>message_runtime</exec_depend>

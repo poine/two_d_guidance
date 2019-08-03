@@ -67,10 +67,10 @@ class BirdEyeTransformer:
         return self.unwarped_img
 
     def draw_debug(self, cam, img=None, lane_model=None, cnt_be=None, border_color=0.4):
-        #if img is None: img = self.unwarped_img
-        #if img.dtype == np.uint8:
-        #    img = img.astype(np.float32)/255.
-        img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
+        if img is None:
+            img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
+        elif img.dtype == np.uint8:
+            img = img.astype(np.float32)/255.
         out_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.float32)
         scale = min(float(cam.h)/self.h, float(cam.w)/self.w)
         h, w = int(scale*self.h), int(scale*self.w)
@@ -98,8 +98,7 @@ class BirdEyeTransformer:
 
     def points_imp_to_be(self, points_imp):
         return cv2.perspectiveTransform(points_imp, self.H)
-    
-    
+
     def unwarped_to_fp(self, cam, cnt_uw):
         #pdb.set_trace()
         s = self.param.dy/self.param.w
@@ -128,6 +127,46 @@ def region_of_interest_vertices(height, width, dh=0.25):
     ]], dtype=np.int32)
 
 
+class ColoredContourDetector:
+    def __init__(self):
+        pass
+    
+    def process_image(self, hsv_img):
+        pass
+         
+
+class StartFinishDetector:
+    def __init__(self):
+        # red is 0-30 and  150-180 values.
+        # we limit to 0-10 and 170-180
+        self.lower_red1, self.upper_red1 = np.array([0,120,70]),   np.array([10,255,255])
+        self.lower_red2, self.upper_red2 = np.array([170,120,70]), np.array([180,255,255])
+        # green is centered on h=60
+        sensitivity = 15
+        self.lower_green, self.upper_green = np.array([60 - sensitivity, 100, 100]), np.array([60 + sensitivity, 255, 255])
+        self.contour_red = ContourFinder()
+        self.contour_green = ContourFinder(min_area=100)
+        
+    def process_image(self, bgr_img):
+        hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
+        mask1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
+        mask2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
+        self.red_mask = mask1 + mask2
+        self.contour_red.process(self.red_mask)
+        #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
+        #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_DILATE, np.ones((3,3), np.uint8))
+        self.green_mask = cv2.inRange(hsv, self.lower_green, self.upper_green)
+        self.contour_green.process(self.green_mask)
+        #print('{} {}'.format(self.contour_red.cnt_max, self.contour_green.cnt_max))
+ 
+    def draw(self, bgr_img):
+        gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+        bgr_img2 = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
+        self.contour_red.draw(bgr_img2, color=(255,0,0))
+        self.contour_green.draw(bgr_img2, color=(0,255,0))
+        return bgr_img2
+
+
 class BinaryThresholder:
     def __init__(self, thresh=196):
         self.thresh_val = thresh#130#196
@@ -143,21 +182,27 @@ class BinaryThresholder:
 
     
 class ContourFinder:
-    def __init__(self):
+    def __init__(self, min_area=None):
         self.img = None
         self.cnt_max = None
+        self.min_area = min_area
         
     def process(self, img):
         self.img2, cnts, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-        #print cnts[0].shape
         self.cnt_max = None
         if cnts is not None and len(cnts) > 0:
             self.cnt_max = max(cnts, key=cv2.contourArea)
+            self.cnt_max_area = cv2.contourArea(self.cnt_max)
+            if self.min_area is not None and self.cnt_max_area < self.min_area:
+               self.cnt_max = None 
             
-    def draw(self, img):
+    def draw(self, img, color=(255,0,0), thickness=3, fill=True):#cv2.FILLED):
         if self.cnt_max is not None:
-            cv2.drawContours(img, self.cnt_max, -1, (255,0,0), 3)
+            cv2.drawContours(img, self.cnt_max, -1, color, thickness)
+            if fill:
+                cv2.fillPoly(img, pts =[self.cnt_max], color=color)
 
+            
 class BlackWhiteThresholder:
     def __init__(self):
         self.low, self.high = 196, 255
@@ -229,141 +274,23 @@ class Pipeline:
         try: cv2.putText(img, 'proc fps: {:.1f}'.format(1./self.last_processing_duration), (20, 140), f, h, c, w)
         except AttributeError: pass
         
-        
-        
-class Contour1Pipeline(Pipeline):
-    show_be, show_thresh, show_contour = range(3)
-    def __init__(self, cam):
-        Pipeline.__init__(self)
-        self.thresholder = BinaryThresholder()
-        self.contour_finder = ContourFinder()
-        self.floor_plane_injector = FloorPlaneInjector()
-        self.lane_model = trru.LaneModel()
-        self.display_mode = Contour1Pipeline.show_contour
-        self.img = None
-        
-    def _process_image(self, img, cam):
-        self.img = img
-        self.img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        self.thresholder.process(self.img_gray)
-        self.contour_finder.process(self.thresholder.threshold)
-        if self.contour_finder.cnt_max is not None:
-            self.floor_plane_injector.compute(self.contour_finder.cnt_max, cam)
-            self.lane_model.fit(self.floor_plane_injector.contour_floor_plane_blf[:,:2])
-            self.lane_model.set_valid(True)
-        else:
-            self.lane_model.set_valid(False)
-        
-    def draw_debug(self, cam, img_cam=None):
-        if self.img is None: return np.zeros((cam.h, cam.w, 3))
-        if self.display_mode == Contour2Pipeline.show_thresh:
-            out_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR) # cv2.COLOR_GRAY2BGR ??
-        else:
-            out_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
-        self.draw_timing(out_img)
-        self.contour_finder.draw(out_img)
-        if self.lane_model.is_valid():
-            self.lane_model.draw_on_cam_img(out_img, cam)
-        return out_img
-        
-class Contour2Pipeline(Pipeline):
-    show_be, show_thresh, show_contour = range(3)
-    def __init__(self, cam, be_param=BirdEyeParam()):
-        Pipeline.__init__(self)
-        self.thresholder = BinaryThresholder()
-        self.contour_finder = ContourFinder()
-        self.bird_eye = BirdEyeTransformer(cam, be_param)
-        self.lane_model = trru.LaneModel()
-        self.display_mode = Contour2Pipeline.show_be
-        self.img = None
-        
-    def _process_image(self, img, cam):
-        self.img = img
-        self.img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY )
-        self.thresholder.process(self.img_gray)
-        self.contour_finder.process(self.thresholder.threshold)
-        if self.contour_finder.cnt_max is not None:
-            cnt_max_imp = cam.undistort_points(self.contour_finder.cnt_max.astype(np.float32))
-            self.cnt_max_be = self.bird_eye.points_imp_to_be(cnt_max_imp)
-            self.cnt_max_lfp = self.bird_eye.unwarped_to_fp(cam, self.cnt_max_be)
-            self.lane_model.fit(self.cnt_max_lfp[:,:2])
-            self.lane_model.set_valid(True)
-        else:
-            self.lane_model.set_valid(False)
-            
-        
-    def draw_debug(self, cam, img_cam=None):
-        if self.img is None: return np.zeros((cam.h, cam.w, 3))
-        if self.display_mode == Contour2Pipeline.show_be:
-            img = self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnt_max_be.astype(np.int32))
-            self.draw_timing(img)
-            return img
-        elif self.display_mode == Contour2Pipeline.show_thresh:
-            img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            self.draw_timing(img)
-            return img
-        elif self.display_mode == Contour2Pipeline.show_contour:
-            img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            self.contour_finder.draw(img)
-            if self.lane_model.is_valid(): self.lane_model.draw_on_cam_img(img, cam)
-            self.draw_timing(img)
-            return img
 
-class Contour3Pipeline(Pipeline):
-    show_be, show_thresh, show_contour = range(3)
-    def __init__(self, cam, be_param=BirdEyeParam()):
-        Pipeline.__init__(self)
-        self.bird_eye = BirdEyeTransformer(cam, be_param)
-        self.thresholder = BinaryThresholder()
-        self.contour_finder = ContourFinder()
-        self.lane_model = trru.LaneModel()
-        self.display_mode = Contour2Pipeline.show_be
-         
-    def _process_image(self, img, cam):
-        undistorted_img = cam.undistort_img2(img) # costly (0.05s)
-        #undistorted_img = img
-        # Project image to Bird Eye view
-        self.bird_eye.process(undistorted_img)
-        # Compute grayscale threshold
-        self.thresholder.process(cv2.cvtColor(self.bird_eye.unwarped_img, cv2.COLOR_BGR2GRAY))
-        # Find largest white contour in bird eye image
-        self.contour_finder.process(self.thresholder.threshold)
-        if self.contour_finder.cnt_max is not None:
-            # Project contour from bird_eye image to floor_plan
-            try: # FIXME
-                self.bird_eye.unwarped_to_fp(cam, self.contour_finder.cnt_max)
-            except IndexError:
-                #pdb.set_trace()
-                pass
-            # Fit lane model from contour (in floorplan(aka base_link_footprint frame)
-            self.lane_model.fit(self.bird_eye.cnt_fp[:,:2])
-            self.lane_model.set_valid(True)
-        else:
-            self.lane_model.set_valid(False)
-        
-    def draw_debug(self, cam, img_cam=None):
-        if self.bird_eye.unwarped_img is None: return np.zeros((cam.h, cam.w, 3))
-        if self.display_mode == Contour2Pipeline.show_be:
-            img = self.bird_eye.unwarped_img
-            self.contour_finder.draw(img)
-            return self.bird_eye.draw_debug(cam, img, self.lane_model)
-        elif self.display_mode == Contour2Pipeline.show_thresh:
-            img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            return self.bird_eye.draw_debug(cam, img, self.lane_model)
-        elif self.display_mode == Contour2Pipeline.show_contour:
-            img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            self.contour_finder.draw(img)
-            return self.bird_eye.draw_debug(cam, img, self.lane_model)
+
+
+
+
+
 
 
 class Foo3Pipeline(Pipeline):
     def __init__(self, cam, be_param=BirdEyeParam()):
+        Pipeline.__init__(self)
         self.bird_eye = BirdEyeTransformer(cam, be_param)
         self.lane_model = trru.LaneModel()
         self.undistorted_img = None
         
     def _process_image(self, img, cam):
-        self.undistorted_img = cam.undistort_img(img)
+        self.undistorted_img = cam.undistort_img2(img)
         self.bird_eye.process(self.undistorted_img)
         self.edges = cv2.Canny(self.bird_eye.unwarped_img, 100, 200)
         
@@ -377,59 +304,6 @@ class Foo3Pipeline(Pipeline):
         return img_out
 
     
-class LaneFinder:
-
-    def __init__(self, cam):
-       
-        #self.houghlinesfinder = HoughLinesFinder()
-        self.c1pipe = Contour1Pipeline(cam)
-        self.c2pipe = Contour2Pipeline(cam)
-        self.inputImageGray = None
-
-
-    def process_rgb_image(self, img, cam):
-        self.c2pipe.process_image(img, cam)
-        #self.process_mono_image(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), cam)
-        
-    def process_mono_image(self, img, cam):
-        self.inputImageGray = img
-        self.c1pipe.process_image(img, cam)
-       #self.houghlinesfinder.process(img)
-        #pdb.set_trace()
-       
-        #self.find_contour(self.bird_eye.unwarped_img)
-        #self.find_lines(img)
-
-    def find_lines(self, img):
-        self.inputImageGray = img
-        self.edges = cv2.Canny(self.inputImageGray, 100, 200, apertureSize = 3)
-        h, w = img.shape
-        self.roi = region_of_interest_vertices(h, w)
-        self.edges_cropped = region_of_interest(self.edges, self.roi)
-        minLineLength = 25 
-        maxLineGap = 25 
-        self.lines = cv2.HoughLinesP(self.edges_cropped, rho=6, theta=np.pi/180 , threshold=30, lines=90, minLineLength=minLineLength, maxLineGap=maxLineGap)
-
-
-    def draw(self, img, cam):
-        #if self.inputImageGray is None: return np.zeros((cam.h, cam.w, 3))
-        if True: # pipe2: birdeye
-            out_img = self.c2pipe.draw_debug(cam)
-        if False: # pipe1: direct
-            out_img = self.c1pipe.draw_debug(cam)
-        if False and self.houghlinesfinder.lines is not None:
-            #try:
-            out_img = cv2.cvtColor(self.houghlinesfinder.edges, cv2.COLOR_GRAY2BGR)
-            for [[x1,y1,x2,y2]] in self.houghlinesfinder.lines:
-                cv2.line(out_img,(x1,y1),(x2,y2),(0,128,0),2)
-            #except TypeError: pass
-        if False:
-            #cv2.drawContours(out_img, self.cnt_max, -1, (0,0,255), 3)
-            cont_img_orig = cv2.perspectiveTransform(self.cnt_max.astype(np.float32), self.bird_eye.h_inv)
-            
-        return out_img
-
-
 
 def plot(lf):
     

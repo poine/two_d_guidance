@@ -4,9 +4,9 @@
   <arg name="start_gazebo_gui" default="true" />
   <arg name="start_filter" default="false" />
   <arg name="start_teleop" default="true" />
-  <arg name="start_fl_lane_detect" default="true" />
-  <arg name="start_fl_fake_lane_detect" default="false" />
-  <arg name="start_fl_guidance" default="true" />
+  <arg name="start_trr_lane_detect" default="true" />
+  <arg name="start_trr_fake_lane_detect" default="false" />
+  <arg name="start_trr_guidance" default="true" />
   <arg name="start_viz" default="true" />
   
   <arg name="world_name" default="$(find common_simulations)/worlds/track_trr_z.world" />
@@ -55,8 +55,8 @@
   </group>
   
   <!--  ****** Lane detection *****  -->
-  <group if="$(arg start_fl_lane_detect)">
-    <node name="follow_line_lane_detector" pkg="two_d_guidance" type="fl_lane_detect_node.py">
+  <group if="$(arg start_trr_lane_detect)">
+    <node name="trr_vision_lane_node" pkg="two_d_guidance" type="trr_vision_lane_node.py">
       <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
       <param name="mask_threshold" value="180"/>
@@ -64,20 +64,20 @@
   </group>
 
   <!--  ****** Fake Lane detection *****  -->
-  <group if="$(arg start_fl_fake_lane_detect)">
-    <node name="follow_line_lane_fake_detector" pkg="two_d_guidance" type="fl_fake_detector_node.py">
+  <group if="$(arg start_trr_fake_lane_detect)">
+    <node name="trr_vision_fake_lane_node" pkg="two_d_guidance" type="trr_vision_fake_lane_node.py">
       <param name="robot_name" value="$(arg robot_name)"/>
       <param name="robot_pose_topic" value="/$(arg robot_name)/base_link_truth1" />
     </node>
   </group>
 
   <!--  ****** Lane guidance *****  -->
-  <group if="$(arg start_fl_guidance)">
-    <node name="trr_guidance" pkg="two_d_guidance" type="fl_guidance_node.py" >
+  <group if="$(arg start_trr_guidance)">
+    <node name="trr_guidance_node" pkg="two_d_guidance" type="trr_guidance_node.py" >
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
       <param name="cmd_topic" value="$(arg robot_name)/diff_drive_controller/cmd_vel"/>
     </node>
-    <node name="trr_guidance_display" pkg="two_d_guidance" type="fl_guidance_display_node.py" >
+    <node name="trr_guidance_display" pkg="two_d_guidance" type="trr_guidance_display_node.py" >
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
     </node>
   </group>

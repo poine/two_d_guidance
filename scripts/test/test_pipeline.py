@@ -4,8 +4,9 @@ import rosbag, cv_bridge
 import pdb
 
 import smocap
-import two_d_guidance.trr_vision_utils as trrvu
-
+import two_d_guidance.trr_vision_utils as trr_vu
+import two_d_guidance.trr.vision.lane_1 as trr_l1
+import two_d_guidance.trr.vision.lane_2 as trr_l2
 
 def test_on_img(pipe, cam, img):
     pipe.process_image(img, cam)
@@ -42,20 +43,20 @@ if __name__ == '__main__':
     elif robot == robot_caroline:
         intr_cam_calib_path = '/home/poine/.ros/camera_info/camera_road_front.yaml'
         extr_cam_calib_path = '/home/poine/work/roverboard/roverboard_description/cfg/caroline_cam_road_front_extr.yaml'
-    cam = trrvu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
+    cam = trr_vu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
 
     pipe_1, pipe_2, pipe_3 = range(3)
     pipe_type = pipe_2
     if pipe_type == pipe_1:    # 154hz
-        pipe = trrvu.Contour1Pipeline(cam)
+        pipe = trr_l1.Contour1Pipeline(cam)
         pipe.thresholder.set_threshold(110)
-        pipe.display_mode = trrvu.Contour2Pipeline.show_thresh
-    elif pipe_type == pipe_2:  # 90hz
-        pipe = trrvu.Contour2Pipeline(cam, trrvu.CarolineBirdEyeParam());
-        pipe.display_mode = trrvu.Contour2Pipeline.show_be
+        pipe.display_mode = trr_l1.Contour2Pipeline.show_be
+    elif pipe_type == pipe_2:  # now 200hz
+        pipe = trr_l2.Contour2Pipeline(cam, trr_vu.CarolineBirdEyeParam());
         pipe.thresholder.set_threshold(110)
+        pipe.display_mode = trr_l2.Contour2Pipeline.show_contour
     elif pipe_type == pipe_3:
-        pipe = trrvu.Foo3Pipeline(cam, trrvu.CarolineBirdEyeParam())
+        pipe = trr_vu.Foo3Pipeline(cam, trr_vu.CarolineBirdEyeParam())
     mode_img, mode_bag = range(2)
     mode = mode_bag
     if mode == mode_img:

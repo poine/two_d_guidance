@@ -9,6 +9,9 @@ import pdb
 import smocap.rospy_utils
 
 import two_d_guidance.trr_utils as trru, two_d_guidance.trr_vision_utils as trrvu
+import two_d_guidance.trr_rospy_utils as trr_rpu
+import two_d_guidance.trr.vision.lane_1 as trr_l1
+import two_d_guidance.trr.vision.lane_2 as trr_l2
 
 import two_d_guidance.cfg.fl_lane_detectorConfig
 
@@ -42,50 +45,12 @@ class ImgPublisher:
         else:
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.img, "rgb8"))
 
-class ContourPublisher:
-    def __init__(self, frame_id='nono_0/base_link_footprint', topic='/follow_line/detected_contour',
-                 contour_blf=None, rgba=(1.,1.,0.,1.)):
-        self.frame_id = frame_id
-        self.rgba = rgba
-        self.pub = rospy.Publisher(topic , visualization_msgs.msg.MarkerArray, queue_size=1)
-        rospy.loginfo(' publishing contour on ({})'.format(topic))
-        self.msg = visualization_msgs.msg.MarkerArray()
-        if contour_blf is not None:
-            self.msg.markers=[self.get_marker(contour_blf, self.rgba)]
-
-    def get_marker(self, contour_blf, rgba=(1.,1.,0.,1.), closed=True):
-        marker = visualization_msgs.msg.Marker()
-        marker.header.frame_id = self.frame_id
-        marker.type = marker.LINE_STRIP
-        marker.action = marker.ADD
-        marker.id = 0
-        marker.text = 'foo'
-        s = marker.scale; s.x, s.y, s.z = 0.01, 0.2, 0.2
-        c = marker.color; c.r, c.g, c.b, c.a = rgba
-        marker.pose.orientation.w = 1.0
-        marker.pose.position.x = 0
-        marker.pose.position.y = 0
-        marker.pose.position.z = 0
-        for x, y, z in contour_blf:
-            p1 = geometry_msgs.msg.Point()
-            p1.x=x; p1.y=y;p1.z=z
-            marker.points.append(p1)
-        if closed:
-            p = geometry_msgs.msg.Point()
-            p.x, p.y, p.z = contour_blf[0]
-            marker.points.append(p)
-        return marker
-
-    def publish(self, contour_blf=None):
-        if contour_blf is not None:
-            self.msg.markers=[self.get_marker(contour_blf, self.rgba)]
-        self.pub.publish(self.msg)
-        
 
 
-class BirdEyePublisher(ContourPublisher):
+
+class BirdEyePublisher(trr_rpu.ContourPublisher):
     def __init__(self, frame_id, be, topic='follow_line/bird_eye'):
-        ContourPublisher.__init__(self, frame_id, topic, be.param.va_bf, (1.,0.,0.,1.))
+        trr_rpu.ContourPublisher.__init__(self, frame_id, topic, be.param.va_bf, rgba=(1.,0.,0.,1.))
         
 
 '''
@@ -97,7 +62,7 @@ class Node:
         self.low_freq = 10.
         robot_name = rospy.get_param('~robot_name', '')
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
-        cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera1')).split(',')
+        cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera_road_front')).split(',')
         ref_frame = rospy.get_param('~ref_frame', prefix(robot_name, 'base_link_footprint'))
         if 1:
             self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(cam_names, fetch_extrinsics=True, world=ref_frame)
@@ -108,16 +73,16 @@ class Node:
             self.cam_sys.cameras[0].set_location(world_to_camo_t, world_to_camo_q)
         self.cam_sys.cameras[0].set_undistortion_param(alpha=1.)
             
-        pipe=1
-        if pipe == 1: self.pipeline = trrvu.Contour1Pipeline(self.cam_sys.cameras[0])
+        pipe=2
+        if pipe == 1: self.pipeline = trr_l1.Contour1Pipeline(self.cam_sys.cameras[0])
         elif pipe == 2:
-            self.pipeline = trrvu.Contour2Pipeline(self.cam_sys.cameras[0], trrvu.CarolineBirdEyeParam())
-            self.pipeline.display_mode = trrvu.Contour2Pipeline.show_be
+            self.pipeline = trr_l2.Contour2Pipeline(self.cam_sys.cameras[0], trrvu.CarolineBirdEyeParam())
+            self.pipeline.display_mode = trr_l2.Contour2Pipeline.show_be
         elif pipe == 3:
             self.pipeline = trrvu.Foo3Pipeline(self.cam_sys.cameras[0])
         self.img_pub = ImgPublisher(self.cam_sys)
-        self.cont_pub = ContourPublisher(frame_id=ref_frame)
-        self.cont2_pub = ContourPublisher(frame_id=ref_frame, topic='/follow_line/detected_contour2', rgba=(1.,0.,1.,1.))
+        self.cont_pub = trr_rpu.ContourPublisher(frame_id=ref_frame)
+        self.cont2_pub = trr_rpu.ContourPublisher(frame_id=ref_frame, topic='/follow_line/detected_contour2', rgba=(1.,0.,1.,1.))
         self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, ref_frame)
         try:
             self.be_pub = BirdEyePublisher(ref_frame, self.pipeline.bird_eye)
