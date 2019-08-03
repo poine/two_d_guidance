@@ -16,9 +16,8 @@ import two_d_guidance.trr.vision.lane_2 as trr_l2
 import two_d_guidance.cfg.fl_lane_detectorConfig
 
 class ImgPublisher:
-    def __init__(self, cam_sys):
+    def __init__(self, cam_sys, img_topic):
         self.publish_compressed = True
-        img_topic = "/follow_line/image_debug"
         rospy.loginfo(' publishing image on ({})'.format(img_topic))
         if self.publish_compressed:
             self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
@@ -64,6 +63,7 @@ class Node:
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
         cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera_road_front')).split(',')
         ref_frame = rospy.get_param('~ref_frame', prefix(robot_name, 'base_link_footprint'))
+        # Camera System
         if 1:
             self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(cam_names, fetch_extrinsics=True, world=ref_frame)
         else:
@@ -72,7 +72,7 @@ class Node:
             world_to_camo_q = [ 0.6194402,  -0.61317113,  0.34761617,  0.34565589]
             self.cam_sys.cameras[0].set_location(world_to_camo_t, world_to_camo_q)
         self.cam_sys.cameras[0].set_undistortion_param(alpha=1.)
-            
+        # Pipeline
         pipe=2
         if pipe == 1: self.pipeline = trr_l1.Contour1Pipeline(self.cam_sys.cameras[0])
         elif pipe == 2:
@@ -80,16 +80,19 @@ class Node:
             self.pipeline.display_mode = trr_l2.Contour2Pipeline.show_be
         elif pipe == 3:
             self.pipeline = trrvu.Foo3Pipeline(self.cam_sys.cameras[0])
-        self.img_pub = ImgPublisher(self.cam_sys)
-        self.cont_pub = trr_rpu.ContourPublisher(frame_id=ref_frame)
-        self.cont2_pub = trr_rpu.ContourPublisher(frame_id=ref_frame, topic='/follow_line/detected_contour2', rgba=(1.,0.,1.,1.))
-        self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, ref_frame)
+        # Publishing
+        # Image
+        self.img_pub = ImgPublisher(img_topic='/trr_vision/lane/image_debug', cam_sys=self.cam_sys)
+        # Markers
+        self.cont_pub = trr_rpu.ContourPublisher(topic='/trr_vision/lane/detected_contour_markers', frame_id=ref_frame)
+        self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, ref_frame, '/trr_vision/lane/fov')
         try:
-            self.be_pub = BirdEyePublisher(ref_frame, self.pipeline.bird_eye)
+            self.be_pub = BirdEyePublisher(ref_frame, self.pipeline.bird_eye, '/trr_vision/lane/bird_eye')
         except AttributeError:
             self.be_pub = None
-        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher(ref_frame=ref_frame)
-        self.lane_model_pub = trru.LaneModelPublisher()
+        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=ref_frame)
+        # Model
+        self.lane_model_pub = trru.LaneModelPublisher('/trr_vision/lane/detected_model')
         self.lane_model = trru.LaneModel()
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_lane_detectorConfig, self.cfg_callback)

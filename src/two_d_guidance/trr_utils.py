@@ -37,7 +37,7 @@ class LaneModel:
                 pass
 
 class LaneModelPublisher:
-    def __init__(self, topic='follow_line/detected_lane_model'):
+    def __init__(self, topic):
         rospy.loginfo(' publishing lane model on ({})'.format(topic))
         self.pub = rospy.Publisher(topic, two_d_guidance.msg.LaneModel, queue_size=1)
 
@@ -48,7 +48,7 @@ class LaneModelPublisher:
 
         
 class LaneModelSubscriber:
-    def __init__(self, topic='follow_line/detected_lane_model'):
+    def __init__(self, topic):
         self.sub = rospy.Subscriber(topic, two_d_guidance.msg.LaneModel, self.msg_callback, queue_size=1)
         rospy.loginfo(' subscribed to ({})'.format(topic))
         self.msg = None
@@ -66,7 +66,7 @@ class LaneModelSubscriber:
             lm.set_valid(False)
 
 class LaneModelMarkerPublisher:
-    def __init__(self, ref_frame="nono_0/base_link_footprint", topic='/follow_line/detected_lane',
+    def __init__(self, topic, ref_frame="nono_0/base_link_footprint",
                  color=(1., 0., 1., 0.)):
         self.pub_lane = rospy.Publisher(topic, visualization_msgs.msg.Marker, queue_size=1)
         rospy.loginfo(' publishing lane model markers on ({})'.format(topic))

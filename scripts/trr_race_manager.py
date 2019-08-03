@@ -16,7 +16,7 @@ class Node:
         #self.pub = rospy.Publisher('/test_optim_node/obstacles', ObstacleArrayMsg, queue_size=1)
         self.start_finish_sub = trr_rpu.TrrStartFinishSubscriber()
         
-        client_name = "trr_guidance"
+        client_name = "trr_guidance_node"
         self.cfg_client = dynamic_reconfigure.client.Client(client_name, timeout=30, config_callback=self.guidance_cfg_callback)
         rospy.loginfo(' client_name: {}'.format(client_name))
         if autostart:
