@@ -200,8 +200,11 @@ class ContourFinder:
         if self.cnt_max is not None:
             cv2.drawContours(img, self.cnt_max, -1, color, thickness)
             if fill:
-                cv2.fillPoly(img, pts =[self.cnt_max], color=color)
-
+                try:
+                    cv2.fillPoly(img, pts =[self.cnt_max], color=color)
+                except cv2.error: # fails when poly is too small?
+                    #print self.cnt_max.shape
+                    pass
             
 class BlackWhiteThresholder:
     def __init__(self):

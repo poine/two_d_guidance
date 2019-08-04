@@ -6,7 +6,7 @@ import two_d_guidance.trr_utils as trru
 class Contour1Pipeline(trr_vu.Pipeline):
     show_be, show_thresh, show_contour = range(3)
     def __init__(self, cam):
-        Pipeline.__init__(self)
+        trr_vu.Pipeline.__init__(self)
         self.thresholder = trr_vu.BinaryThresholder()
         self.contour_finder = trr_vu.ContourFinder()
         self.floor_plane_injector = trr_vu.FloorPlaneInjector()
@@ -28,7 +28,7 @@ class Contour1Pipeline(trr_vu.Pipeline):
         
     def draw_debug(self, cam, img_cam=None):
         if self.img is None: return np.zeros((cam.h, cam.w, 3))
-        if self.display_mode == Contour2Pipeline.show_thresh:
+        if self.display_mode == Contour1Pipeline.show_thresh:
             out_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR) # cv2.COLOR_GRAY2BGR ??
         else:
             out_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
