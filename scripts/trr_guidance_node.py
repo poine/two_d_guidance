@@ -114,7 +114,7 @@ class Node:
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_guidanceConfig, self.cfg_callback)
-        self.lane_model_sub = trru.LaneModelSubscriber()
+        self.lane_model_sub = trru.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.odom_sub = OdomListener()
 
     def cfg_callback(self, config, level):
