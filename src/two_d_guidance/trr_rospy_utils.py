@@ -98,10 +98,39 @@ class TrrStartFinishSubscriber:
         else:
             return [], [], 0.
 
+    def viewing_finish(self):
+        return (self.msg is not None) and\
+               ((rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout) and\
+               (self.msg.finish_points)
+        
 
+class TrrTrafficLightPublisher:
+    def __init__(self, topic='trr_vision/traffic_light/status'):
+        rospy.loginfo(' publishing traffic light status on ({})'.format(topic))
+        self.pub = rospy.Publisher(topic, two_d_guidance.msg.TrrTrafficLight, queue_size=1)
+    def publish(self, pl):
+        msg = two_d_guidance.msg.TrrTrafficLight()
+        msg.red = pl.red_ctr_detc.has_contour()
+        msg.yellow = False#pl.red_ctr_detc.has_contour()
+        msg.green = pl.green_ctr_detc.has_contour()
+        self.pub.publish(msg)
 
+class TrrTrafficLightSubscriber:
+    def __init__(self, topic='trr_vision/traffic_light/status'):
+        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.TrrTrafficLight, self.msg_callback, queue_size=1)
+        rospy.loginfo(' subscribed to ({})'.format(topic))
+        self.msg = None
+        self.timeout = 0.5     
 
+    def msg_callback(self, msg):
+        self.msg = msg
+        self.last_msg_time = rospy.get_rostime()
 
+    def get(self):
+        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
+            return self.msg.red, self.msg.yellow, self.msg.green
+        else: return False, False, False
+        
 class TrrSimpleVisionPipeNode:
     def __init__(self, pipeline_class, pipe_cbk=None, low_freq=10):
         self.low_freq = low_freq

@@ -6,7 +6,10 @@
   <arg name="start_teleop" default="true" />
   <arg name="start_trr_lane_detect" default="true" />
   <arg name="start_trr_fake_lane_detect" default="false" />
+  <arg name="start_trr_start_finish" default="true" />
+  <arg name="start_trr_traffic_light" default="true" />
   <arg name="start_trr_guidance" default="true" />
+  <arg name="start_trr_race_manager" default="true" />
   <arg name="start_viz" default="true" />
   
   <arg name="world_name" default="$(find common_simulations)/worlds/track_trr_z.world" />
@@ -71,6 +74,33 @@
     </node>
   </group>
 
+  <!--  ****** Start Finish detection *****  -->
+  <group if="$(arg start_trr_start_finish)">
+    <node name="trr_vision_start_finish_node" pkg="two_d_guidance" type="trr_vision_start_finish_node.py">
+      <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
+      <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
+      <param name="mask_threshold" value="180"/>
+    </node>
+  </group>
+
+  <!--  ****** Traffic Light detection *****  -->
+  <group if="$(arg start_trr_traffic_light)">
+    <node name="trr_vision_traffic_light_node" pkg="two_d_guidance" type="trr_vision_traffic_light_node.py">
+      <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
+      <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
+    </node>
+  </group>
+
+  <!--  ****** Race Manager *****  -->
+  <group if="$(arg start_trr_race_manager)">
+    <node name="trr_race_manager_node" pkg="two_d_guidance" type="trr_race_manager.py">
+      <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
+      <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
+      <param name="mask_threshold" value="180"/>
+    </node>
+  </group>
+
+  
   <!--  ****** Lane guidance *****  -->
   <group if="$(arg start_trr_guidance)">
     <node name="trr_guidance_node" pkg="two_d_guidance" type="trr_guidance_node.py" >

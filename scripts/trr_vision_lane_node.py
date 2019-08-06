@@ -13,7 +13,7 @@ import two_d_guidance.trr_rospy_utils as trr_rpu
 import two_d_guidance.trr.vision.lane_1 as trr_l1
 import two_d_guidance.trr.vision.lane_2 as trr_l2
 
-import two_d_guidance.cfg.fl_lane_detectorConfig
+import two_d_guidance.cfg.trr_vision_laneConfig
 
 class ImgPublisher:
     def __init__(self, cam_sys, img_topic):
@@ -95,7 +95,7 @@ class Node:
         self.lane_model_pub = trru.LaneModelPublisher('/trr_vision/lane/detected_model')
         self.lane_model = trru.LaneModel()
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
-        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_lane_detectorConfig, self.cfg_callback)
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_laneConfig, self.cfg_callback)
 
     def cfg_callback(self, config, level):
         rospy.loginfo("  Reconfigure Request:")
@@ -127,7 +127,8 @@ class Node:
 
             
     def periodic(self):
-        self.publish_image()
+        if  self.pipeline.display_mode != self.pipeline.show_none:
+            self.publish_image()
         self.publish_3Dmarkers()
     
     def run(self):
@@ -140,10 +141,11 @@ class Node:
             pass
         
 def main(args):
-  rospy.init_node('fl_lane_detect_node')
-  rospy.loginfo('fl_lane_detect_node starting')
-  rospy.loginfo('  using opencv version {}'.format(cv2.__version__))
-  Node().run()
+    name = 'trr_vision_lane_node'
+    rospy.init_node(name)
+    rospy.loginfo('{name} starting')
+    rospy.loginfo('  using opencv version {}'.format(cv2.__version__))
+    Node().run()
 
 
 if __name__ == '__main__':

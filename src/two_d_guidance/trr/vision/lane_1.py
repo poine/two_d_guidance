@@ -4,7 +4,7 @@ import two_d_guidance.trr_vision_utils as trr_vu
 import two_d_guidance.trr_utils as trru
 
 class Contour1Pipeline(trr_vu.Pipeline):
-    show_be, show_thresh, show_contour = range(3)
+    show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam):
         trr_vu.Pipeline.__init__(self)
         self.thresholder = trr_vu.BinaryThresholder()

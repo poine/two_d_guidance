@@ -5,7 +5,7 @@ import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg#, visualization_msgs.msg, sensor_msgs.msg
 
 import two_d_guidance.trr_utils as trru
-import two_d_guidance.cfg.fl_guidanceConfig  # dynamic reconfigure
+import two_d_guidance.cfg.trr_guidanceConfig  # dynamic reconfigure
 
 import pdb
 
@@ -113,7 +113,7 @@ class Node:
         cmd_topic = rospy.get_param('~cmd_topic', '/nono_0/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
-        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.fl_guidanceConfig, self.cfg_callback)
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
         self.lane_model_sub = trru.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.odom_sub = OdomListener()
 
