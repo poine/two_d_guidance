@@ -32,7 +32,9 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
             self.red_ctr_be = self.bird_eye.points_imp_to_be(red_ctr_imp)
             self.red_ctr_lfp = self.bird_eye.unwarped_to_fp(cam, self.red_ctr_be)
             # centroid in bird eye image
-            M = cv2.moments(self.red_ctr_be); cx = M['m10']/M['m00']; cy = M['m01']/M['m00']
+            M = cv2.moments(self.red_ctr_be); m00=M['m00']
+            cx = M['m10']/m00 if abs(m00) > 1e-9 else 0
+            cy = M['m01']/m00 if abs(m00) > 1e-9 else 0
             #print cx, cy
             # centroid in local floor plane
             c_lfp = self.bird_eye.unwarped_to_fp(cam, np.array([[cx, cy], [cx, cy]]))[0]

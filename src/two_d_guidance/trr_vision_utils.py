@@ -66,7 +66,7 @@ class BirdEyeTransformer:
         self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h))
         return self.unwarped_img
 
-    def draw_debug(self, cam, img=None, lane_model=None, cnt_be=None, border_color=0.4):
+    def draw_debug(self, cam, img=None, lane_model=None, cnt_be=None, border_color=0.4, fill_color=(255, 0, 255)):
         if img is None:
             img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
         elif img.dtype == np.uint8:
@@ -75,10 +75,11 @@ class BirdEyeTransformer:
         scale = min(float(cam.h)/self.h, float(cam.w)/self.w)
         h, w = int(scale*self.h), int(scale*self.w)
         dx = (cam.w-w)/2
-        if lane_model is not None and lane_model.is_valid():
-            self.draw_line(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
         if  cnt_be is not None:
             cv2.drawContours(img, cnt_be, -1, (255,0,255), 3)
+            cv2.fillPoly(img, pts =[cnt_be], color=fill_color)
+        if lane_model is not None and lane_model.is_valid():
+            self.draw_line(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
         out_img[:h, dx:dx+w] = cv2.resize(img, (w, h))
         return out_img
 
@@ -126,65 +127,12 @@ def region_of_interest_vertices(height, width, dh=0.25):
     (width, height),
     ]], dtype=np.int32)
 
-
-class ColoredContourDetector:
-    def __init__(self):
-        pass
-    
-    def process_image(self, hsv_img):
-        pass
-         
-
-class StartFinishDetector:
-    def __init__(self):
-        # red is 0-30 and  150-180 values.
-        # we limit to 0-10 and 170-180
-        self.lower_red1, self.upper_red1 = np.array([0,120,70]),   np.array([10,255,255])
-        self.lower_red2, self.upper_red2 = np.array([170,120,70]), np.array([180,255,255])
-        # green is centered on h=60
-        sensitivity = 15
-        self.lower_green, self.upper_green = np.array([60 - sensitivity, 100, 100]), np.array([60 + sensitivity, 255, 255])
-        self.contour_red = ContourFinder()
-        self.contour_green = ContourFinder(min_area=100)
-        
-    def process_image(self, bgr_img):
-        hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
-        mask1 = cv2.inRange(hsv, self.lower_red1, self.upper_red1)
-        mask2 = cv2.inRange(hsv, self.lower_red2, self.upper_red2)
-        self.red_mask = mask1 + mask2
-        self.contour_red.process(self.red_mask)
-        #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
-        #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_DILATE, np.ones((3,3), np.uint8))
-        self.green_mask = cv2.inRange(hsv, self.lower_green, self.upper_green)
-        self.contour_green.process(self.green_mask)
-        #print('{} {}'.format(self.contour_red.cnt_max, self.contour_green.cnt_max))
- 
-    def draw(self, bgr_img):
-        gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-        bgr_img2 = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
-        self.contour_red.draw(bgr_img2, color=(255,0,0))
-        self.contour_green.draw(bgr_img2, color=(0,255,0))
-        return bgr_img2
-
-
-class BinaryThresholder:
-    def __init__(self, thresh=196):
-        self.thresh_val = thresh#130#196
-        self.threshold = None
-        
-    def process(self, img):
-        #pdb.set_trace()
-        blurred = cv2.GaussianBlur(img, (9, 9), 0)
-        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
-        return self.threshold
-
-    def set_threshold(self, thresh): self.thresh_val = thresh
-
     
 class ContourFinder:
     def __init__(self, min_area=None):
         self.img = None
         self.cnt_max = None
+        self.cnt_max_area = 0
         self.min_area = min_area
         
     def process(self, img):
@@ -194,17 +142,88 @@ class ContourFinder:
             self.cnt_max = max(cnts, key=cv2.contourArea)
             self.cnt_max_area = cv2.contourArea(self.cnt_max)
             if self.min_area is not None and self.cnt_max_area < self.min_area:
-               self.cnt_max = None 
+               self.cnt_max = None
+               self.cnt_max_area = 0
             
-    def draw(self, img, color=(255,0,0), thickness=3, fill=True):#cv2.FILLED):
+    def draw(self, img, color=(255,0,0), thickness=3, fill=True, fill_color=(255,0,0)):
         if self.cnt_max is not None:
-            cv2.drawContours(img, self.cnt_max, -1, color, thickness)
             if fill:
                 try:
-                    cv2.fillPoly(img, pts =[self.cnt_max], color=color)
+                    cv2.fillPoly(img, pts =[self.cnt_max], color=fill_color)
                 except cv2.error: # fails when poly is too small?
                     #print self.cnt_max.shape
                     pass
+            cv2.drawContours(img, self.cnt_max, -1, color, thickness)
+
+class ColoredContourDetector:
+    def __init__(self, hsv_ranges, min_area=None):
+        self.set_hsv_ranges(hsv_ranges)
+        self.mask = None
+        self.bin_ctr_finder = ContourFinder(min_area)
+
+    def set_hsv_ranges(self, hsv_ranges):
+        self.hsv_ranges = hsv_ranges
+
+    def has_contour(self): return (self.bin_ctr_finder.cnt_max is not None)
+    def get_contour(self): return self.bin_ctr_finder.cnt_max
+    def get_contour_area(self): return self.bin_ctr_finder.cnt_max_area
+        
+    def process_bgr_image(self, bgr_img): return self.process_hsv_image(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV))
+    def process_rgb_image(self, rgb_img): return self.process_hsv_image(cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV))
+    def process_hsv_image(self, hsv_img):
+        masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_ranges]
+        self.mask = np.sum(masks, axis=0).astype(np.uint8)
+        #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
+        #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_DILATE, np.ones((3,3), np.uint8))
+        self.bin_ctr_finder.process(self.mask)
+            
+    def draw(self, bgr_img, color=(255,0,0), fill_color=(255,255,0)):
+        self.bin_ctr_finder.draw(bgr_img, thickness=1, color=color, fill_color=fill_color)
+        return bgr_img
+#
+# HSV range for different colors
+#
+# Red is 0-30 and  150-180 values.
+# we limit to 0-10 and 170-180
+def hsv_red_ranges(hsens=10, smin=100, smax=255, vmin=30, vmax=255):
+    red_ranges = [[np.array([0,smin,vmin]),   np.array([hsens,smax,vmax])],
+                  [np.array([180-hsens,smin,vmin]), np.array([180,smax,vmax])]]
+    return red_ranges
+# Green is centered on h=60
+def hsv_green_range(hsens=10, smin=100, smax=255, vmin=100, vmax=255):
+    green_range = [[np.array([60-hsens, smin, vmin]), np.array([60+hsens, smax, vmax])]]
+    return green_range
+    
+class StartFinishDetector:
+    def __init__(self):
+        self.red_ccf = ColoredContourDetector(hsv_red_ranges())
+        self.green_ccf = ColoredContourDetector(hsv_green_range(), min_area=100)
+        
+    def process_image(self, bgr_img):
+        hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
+        self.red_ccf.process_hsv_image(hsv)
+        self.green_ccf.process_hsv_image(hsv)
+ 
+    def draw(self, bgr_img):
+        gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+        bgr_img2 = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
+        self.red_ccf.draw(bgr_img2, color=(255,0,0))
+        self.green_ccf.draw(bgr_img2, color=(0,255,0))
+        return bgr_img2
+
+
+class BinaryThresholder:
+    def __init__(self, thresh=200):
+        self.thresh_val = thresh
+        self.threshold = None
+        
+    def process(self, img):
+        blurred = cv2.GaussianBlur(img, (9, 9), 0)
+        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
+        return self.threshold
+
+    def set_threshold(self, thresh): self.thresh_val = thresh
+
             
 class BlackWhiteThresholder:
     def __init__(self):
@@ -256,11 +275,20 @@ class Pipeline:
         self.skipped_frames = 0
         self.last_seq = None
         self.last_stamp = None
-        self.real_fps = 0.
+        self.cur_fps = 0.
+        self.min_fps, self.max_fps, self.lp_fps = np.inf, 0, 0
+        self.last_processing_duration = None
+        self.min_proc, self.max_proc, self.lp_proc = np.inf, 0, 1e-6
+        self.k_lp = 0.9 # low pass coefficient
         
     def process_image(self, img, cam, stamp, seq):
         if self.last_stamp is not None:
-            self.real_fps = 1./(stamp - self.last_stamp).to_sec()
+            _dt = (stamp - self.last_stamp).to_sec()
+            if np.abs(_dt) > 1e-9:
+                self.cur_fps = 1./_dt
+                self.min_fps = np.min([self.min_fps, self.cur_fps])
+                self.max_fps = np.max([self.max_fps, self.cur_fps])
+                self.lp_fps  = self.k_lp*self.lp_fps+(1-self.k_lp)*self.cur_fps
         self.last_stamp = stamp
         if self.last_seq is not None:
             self.skipped_frames += seq-self.last_seq-1
@@ -269,12 +297,15 @@ class Pipeline:
         self._process_image(img, cam)
         _end = time.time()
         self.last_processing_duration = _end-_start
+        self.min_proc = np.min([self.min_proc, self.last_processing_duration])
+        self.max_proc = np.max([self.max_proc, self.last_processing_duration])
+        self.lp_proc = self.k_lp*self.lp_proc+(1-self.k_lp)*self.last_processing_duration
 
-    def draw_timing(self, img):
+    def draw_timing(self, img, y0=40, dy=50):
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (0, 255, 0), 2
-        cv2.putText(img, 'fps: {:.1f}'.format(self.real_fps), (20, 40), f, h, c, w)
-        cv2.putText(img, 'skipped: {:d}'.format(self.skipped_frames), (20, 90), f, h, c, w)
-        try: cv2.putText(img, 'proc fps: {:.1f}'.format(1./self.last_processing_duration), (20, 140), f, h, c, w)
+        cv2.putText(img, 'fps: {:.1f} ( min {:.1f} max {:.1f})'.format(self.lp_fps, self.min_fps, self.max_fps), (20, y0), f, h, c, w)
+        cv2.putText(img, 'skipped: {:d}'.format(self.skipped_frames), (20, y0+dy), f, h, c, w)
+        try: cv2.putText(img, 'proc : {:.3f}/{:.3f}s'.format(self.lp_proc, 1./self.lp_fps), (20, y0+2*dy), f, h, c, w)
         except AttributeError: pass
         
 

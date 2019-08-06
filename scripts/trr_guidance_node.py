@@ -61,11 +61,11 @@ class Guidance:
         self.vel_ctl = VelCtl()
         self.vel_sp = vel_sp
     
-    def compute(self, lane_model, expl_noise=0.025):
+    def compute(self, lane_model, expl_noise=0.025, dy=0.):
         lin = self.vel_ctl.get(lane_model)
         self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
         self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
-        self.carrot = [self.lookahead_dist, lane_model.get_y(self.lookahead_dist)]
+        self.carrot = [self.lookahead_dist, lane_model.get_y(self.lookahead_dist)+dy]
         self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
         lin, ang = lin, lin/self.R
         ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())

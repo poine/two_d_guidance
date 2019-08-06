@@ -62,7 +62,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             if self.lane_model.is_valid(): self.lane_model.draw_on_cam_img(debug_img, cam)
             
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
-        cv2.putText(debug_img, 'Lane detection', (20, 40), f, h, c, w)
+        cv2.putText(debug_img, 'Lane detection 2', (20, 40), f, h, c, w)
         self.draw_timing(debug_img, y0=90)
         # we return a RGB image
         return cv2.cvtColor(debug_img, cv2.COLOR_BGR2RGB)

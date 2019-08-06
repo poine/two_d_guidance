@@ -55,6 +55,8 @@ if __name__ == '__main__':
         pipe = trr_l2.Contour2Pipeline(cam, trr_vu.CarolineBirdEyeParam());
         pipe.thresholder.set_threshold(110)
         pipe.display_mode = trr_l2.Contour2Pipeline.show_contour
+        #pipe.set_roi((0, 0),(cam.w, cam.h))
+        pipe.set_roi((0, 130),(cam.w, cam.h))
     elif pipe_type == pipe_3:
         pipe = trr_vu.Foo3Pipeline(cam, trr_vu.CarolineBirdEyeParam())
     mode_img, mode_bag = range(2)
