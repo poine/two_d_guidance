@@ -127,7 +127,37 @@ def region_of_interest_vertices(height, width, dh=0.25):
     (width, height),
     ]], dtype=np.int32)
 
-    
+
+class ColoredBlobDetector:
+    def __init__(self, hsv_ranges, cfg_path=None):
+        self.blob_params = cv2.SimpleBlobDetector_Params()
+        self.set_hsv_ranges(hsv_ranges)
+        if cfg_path is not None:
+            self.load_cfg(cfg_path)
+        else:
+            self.detector = cv2.SimpleBlobDetector_create(self.blob_params)
+
+    def set_hsv_ranges(self, hsv_ranges):
+        self.hsv_ranges = hsv_ranges
+        
+    def load_cfg(self, path):
+        with open(path, 'r') as stream:   
+            d = yaml.load(stream)
+        for k in d:
+            setattr(self.blob_params, k, d[k])
+        self.detector = cv2.SimpleBlobDetector_create(self.blob_params)   
+
+    def process_hsv_image(self, hsv_img):
+        masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_ranges]
+        self.mask = np.sum(masks, axis=0).astype(np.uint8)
+        self.keypoints = self.detector.detect(self.mask)
+        print self.keypoints
+
+    def draw(self, img):
+        img_with_keypoints = cv2.drawKeypoints(img, self.keypoints, outImage=np.array([]), color=(255, 0, 255),
+                                               flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        return img_with_keypoints
+
 class ContourFinder:
     def __init__(self, min_area=None):
         self.img = None
@@ -181,19 +211,42 @@ class ColoredContourDetector:
         self.bin_ctr_finder.draw(bgr_img, thickness=1, color=color, fill_color=fill_color)
         return bgr_img
 #
-# HSV range for different colors
+# HSV range for different colors in cv conventions (h in [0 180], s and v in [0 255]
 #
 # Red is 0-30 and  150-180 values.
 # we limit to 0-10 and 170-180
-def hsv_red_ranges(hsens=10, smin=100, smax=255, vmin=30, vmax=255):
-    red_ranges = [[np.array([0,smin,vmin]),   np.array([hsens,smax,vmax])],
-                  [np.array([180-hsens,smin,vmin]), np.array([180,smax,vmax])]]
+def hsv_red_ranges(hc=0, hsens=10, smin=100, smax=255, vmin=30, vmax=255):
+    # red_ranges = [[np.array([0,smin,vmin]), np.array([hsens,smax,vmax])],
+    #               [np.array([180-hsens,smin,vmin]), np.array([180,smax,vmax])]]
+    red_ranges = hsv_range(hc, hsens, smin, smax, vmin, vmax)
     return red_ranges
+# Yellow is centered on h=30
+def hsv_yellow_range(hsens=10, smin=100, smax=255, vmin=100, vmax=255):
+    return hsv_range(30, hsens, smin, smax, vmin, vmax)
 # Green is centered on h=60
 def hsv_green_range(hsens=10, smin=100, smax=255, vmin=100, vmax=255):
-    green_range = [[np.array([60-hsens, smin, vmin]), np.array([60+hsens, smax, vmax])]]
-    return green_range
+    return hsv_range(60, hsens, smin, smax, vmin, vmax)
+# Blue is centered on h=110
+def hsv_blue_range(hsens=10, smin=50, smax=255, vmin=50, vmax=255):
+    return hsv_range(110, hsens, smin, smax, vmin, vmax)
+
+def hsv_range(hcenter, hsens, smin, smax, vmin, vmax):
+    # compute hsv range, wrap around 180 if needed (returns bottom and top range in this case)
+    hmin, hmax = hcenter-hsens, hcenter+hsens
+    ranges = []
+    if hmin < 0:
+        ranges.append([np.array([0, smin, vmin]), np.array([hmax, smax, vmax])])
+        ranges.append([np.array([hmin+180, smin, vmin]), np.array([180, smax, vmax])])
+    elif hmax > 180:
+        ranges.append([np.array([0, smin, vmin]),    np.array([hmax-180, smax, vmax])])
+        ranges.append([np.array([hmin, smin, vmin]), np.array([180, smax, vmax])])
+    else:
+        ranges.append([np.array([hmin, smin, vmin]), np.array([hmax, smax, vmax])])
+    return ranges
+    #return [[np.array([hcenter-hsens, smin, vmin]), np.array([hcenter+hsens, smax, vmax])]]
+
     
+
 class StartFinishDetector:
     def __init__(self):
         self.red_ccf = ColoredContourDetector(hsv_red_ranges())
@@ -276,7 +329,7 @@ class Pipeline:
         self.last_seq = None
         self.last_stamp = None
         self.cur_fps = 0.
-        self.min_fps, self.max_fps, self.lp_fps = np.inf, 0, 0
+        self.min_fps, self.max_fps, self.lp_fps = np.inf, 0, 0.1
         self.last_processing_duration = None
         self.min_proc, self.max_proc, self.lp_proc = np.inf, 0, 1e-6
         self.k_lp = 0.9 # low pass coefficient

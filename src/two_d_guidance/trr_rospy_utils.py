@@ -146,8 +146,11 @@ class TrrSimpleVisionPipeNode:
         
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
 
+    # we get a bgr8 image as input
     def on_image(self, img, (cam_idx, stamp, seq)):
-        img_bgr = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #img_bgr = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_bgr = img
+        #img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         self.pipeline.process_image(img_bgr, self.cam_sys.cameras[cam_idx], stamp, seq)
         if self.pipe_cbk is not None: self.pipe_cbk()
         
