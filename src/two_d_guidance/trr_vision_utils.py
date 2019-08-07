@@ -149,8 +149,8 @@ class ColoredBlobDetector:
         'minRepeatability',
         'minThreshold',
         'thresholdStep' ]
-
-      def __init__(self, hsv_ranges, cfg_path=None):
+    
+    def __init__(self, hsv_ranges, cfg_path=None):
         self.blob_params = cv2.SimpleBlobDetector_Params()
         self.set_hsv_ranges(hsv_ranges)
         if cfg_path is not None:
@@ -168,11 +168,22 @@ class ColoredBlobDetector:
             setattr(self.blob_params, k, d[k])
         self.detector = cv2.SimpleBlobDetector_create(self.blob_params)   
 
+    def save_cfg(self, path):
+        d = {}
+        for p in ColoredBlobDetector.param_names:
+            d[p] =  getattr(self.params, p)
+        with open(path, 'w') as stream:
+            yaml.dump(d, stream, default_flow_style=False)
+
+    def update_param(self, name, value):
+        setattr(self.blob_params, name, value)
+        self.detector = cv2.SimpleBlobDetector_create(self.blob_params)
+            
     def process_hsv_image(self, hsv_img):
         masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_ranges]
         self.mask = np.sum(masks, axis=0).astype(np.uint8)
         self.keypoints = self.detector.detect(self.mask)
-        print self.keypoints
+        return self.keypoints, None
 
     def draw(self, img):
         img_with_keypoints = cv2.drawKeypoints(img, self.keypoints, outImage=np.array([]), color=(255, 0, 255),
