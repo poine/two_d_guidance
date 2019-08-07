@@ -129,7 +129,28 @@ def region_of_interest_vertices(height, width, dh=0.25):
 
 
 class ColoredBlobDetector:
-    def __init__(self, hsv_ranges, cfg_path=None):
+    param_names = [
+        'blobColor',
+        'filterByArea',
+        'filterByCircularity',
+        'filterByColor',
+        'filterByConvexity',
+        'filterByInertia',
+        'maxArea',
+        'maxCircularity',
+        'maxConvexity',
+        'maxInertiaRatio',
+        'maxThreshold',
+        'minArea',
+        'minCircularity',
+        'minConvexity',
+        'minDistBetweenBlobs',
+        'minInertiaRatio',
+        'minRepeatability',
+        'minThreshold',
+        'thresholdStep' ]
+
+      def __init__(self, hsv_ranges, cfg_path=None):
         self.blob_params = cv2.SimpleBlobDetector_Params()
         self.set_hsv_ranges(hsv_ranges)
         if cfg_path is not None:
