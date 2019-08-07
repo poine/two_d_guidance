@@ -15,7 +15,7 @@ def load_cam_from_files(intr_path, extr_path, cam_name='cam1', alpha=1.):
     cam.load_extrinsics(extr_path)
     return cam
 
-
+# read an array of points - this is used for bireye calibration
 def read_point(yaml_data_path):
     with open(yaml_data_path, 'r') as stream:
         ref_data = yaml.load(stream)
@@ -150,23 +150,25 @@ class ColoredBlobDetector:
         'minThreshold',
         'thresholdStep' ]
     
-    def __init__(self, hsv_ranges, cfg_path=None):
+    def __init__(self, hsv_range, cfg_path=None):
         self.blob_params = cv2.SimpleBlobDetector_Params()
-        self.set_hsv_ranges(hsv_ranges)
+        self.set_hsv_range(hsv_range)
         if cfg_path is not None:
             self.load_cfg(cfg_path)
         else:
             self.detector = cv2.SimpleBlobDetector_create(self.blob_params)
+        self.keypoints = []
 
-    def set_hsv_ranges(self, hsv_ranges):
-        self.hsv_ranges = hsv_ranges
+    def set_hsv_range(self, hsv_range):
+        self.hsv_range = hsv_range
         
     def load_cfg(self, path):
+        print('loading config {}'.format(path))
         with open(path, 'r') as stream:   
             d = yaml.load(stream)
         for k in d:
             setattr(self.blob_params, k, d[k])
-        self.detector = cv2.SimpleBlobDetector_create(self.blob_params)   
+        self.detector = cv2.SimpleBlobDetector_create(self.blob_params)
 
     def save_cfg(self, path):
         d = {}
@@ -180,15 +182,25 @@ class ColoredBlobDetector:
         self.detector = cv2.SimpleBlobDetector_create(self.blob_params)
             
     def process_hsv_image(self, hsv_img):
-        masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_ranges]
+        masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_range]
         self.mask = np.sum(masks, axis=0).astype(np.uint8)
         self.keypoints = self.detector.detect(self.mask)
+        #print('detected {}'.format(self.keypoints))
         return self.keypoints, None
 
-    def draw(self, img):
-        img_with_keypoints = cv2.drawKeypoints(img, self.keypoints, outImage=np.array([]), color=(255, 0, 255),
-                                               flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        return img_with_keypoints
+    def keypoints_nb(self): return len(self.keypoints)
+    
+    def draw(self, img, color):
+        if len(self.keypoints) > 0:
+            img_with_keypoints = cv2.drawKeypoints(img, self.keypoints, outImage=np.array([]), color=color,
+                                                   flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            for k in self.keypoints:
+                cv2.circle(img, tuple(np.array(k.pt).astype(np.int)), radius=int(k.size), color=color, thickness=2, lineType=8, shift=0)
+                #if color == (0, 0, 255): print k.pt, k.size
+            
+                #print([kp.pt for kp in keypoints])
+                return img_with_keypoints
+            else: return img
 
 class ContourFinder:
     def __init__(self, min_area=None):
@@ -218,40 +230,68 @@ class ContourFinder:
             cv2.drawContours(img, self.cnt_max, -1, color, thickness)
 
 class ColoredContourDetector:
-    def __init__(self, hsv_ranges, min_area=None):
-        self.set_hsv_ranges(hsv_ranges)
-        self.mask = None
+    def __init__(self, hsv_range, min_area=None, gray_tresh=150):
+        #self.mask_extractor = ColoredMaskExtractor(hsv_range)
+        self.mask_extractor = ColoredAndLightMaskExtractor(hsv_range)
         self.bin_ctr_finder = ContourFinder(min_area)
 
-    def set_hsv_ranges(self, hsv_ranges):
-        self.hsv_ranges = hsv_ranges
-
+    def set_hsv_range(self, hsv_range):
+        self.mask_extractor.set_hsv_range(hsv_range)
+    def set_gray_threshold(self, v): 
+        self.mask_extractor.set_threshold(v)
+        
     def has_contour(self): return (self.bin_ctr_finder.cnt_max is not None)
     def get_contour(self): return self.bin_ctr_finder.cnt_max
     def get_contour_area(self): return self.bin_ctr_finder.cnt_max_area
         
-    def process_bgr_image(self, bgr_img): return self.process_hsv_image(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV))
-    def process_rgb_image(self, rgb_img): return self.process_hsv_image(cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV))
-    def process_hsv_image(self, hsv_img):
-        masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_ranges]
-        self.mask = np.sum(masks, axis=0).astype(np.uint8)
+    #def process_bgr_image(self, bgr_img): return self.process_hsv_image(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV))
+    #def process_rgb_image(self, rgb_img): return self.process_hsv_image(cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV))
+    def process_hsv_image(self, hsv_img, img_gray):
+        self.mask = self.mask_extractor.process_hsv_image(hsv_img, img_gray)
         #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
         #self.mask = cv2.morphologyEx(self.mask, cv2.MORPH_DILATE, np.ones((3,3), np.uint8))
-        self.bin_ctr_finder.process(self.mask)
+        self.bin_ctr_finder.process(self.mask_extractor.mask)
+            
             
     def draw(self, bgr_img, color=(255,0,0), fill_color=(255,255,0)):
         self.bin_ctr_finder.draw(bgr_img, thickness=1, color=color, fill_color=fill_color)
         return bgr_img
+
+class ColoredMaskExtractor:
+    def __init__(self,  hsv_range):
+        self.set_hsv_range(hsv_range)
+        self.mask = None
+        
+    def set_hsv_range(self, hsv_range):
+        self.hsv_range = hsv_range
+
+    def process_hsv_image(self, hsv_img, img_gray):
+        masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_range]
+        self.mask = np.sum(masks, axis=0).astype(np.uint8)
+        return self.mask
+
+class ColoredAndLightMaskExtractor(ColoredMaskExtractor):
+    def __init__(self,  hsv_range, gray_thresh=150):
+        ColoredMaskExtractor.__init__(self,  hsv_range)
+        self.grey_mask = BinaryThresholder(thresh=gray_thresh)
+
+    def set_threshold(self, v): self.grey_mask.set_threshold(v)
+
+    def process_hsv_image(self, hsv_img, img_gray):
+        ColoredMaskExtractor.process_hsv_image(self, hsv_img, img_gray)
+        self.mask += self.grey_mask.process(img_gray)
+        return self.mask
+        
 #
 # HSV range for different colors in cv conventions (h in [0 180], s and v in [0 255]
 #
 # Red is 0-30 and  150-180 values.
 # we limit to 0-10 and 170-180
-def hsv_red_ranges(hc=0, hsens=10, smin=100, smax=255, vmin=30, vmax=255):
-    # red_ranges = [[np.array([0,smin,vmin]), np.array([hsens,smax,vmax])],
+def hsv_red_range(hc=0, hsens=10, smin=100, smax=255, vmin=30, vmax=255):
+    # red_range = [[np.array([0,smin,vmin]), np.array([hsens,smax,vmax])],
     #               [np.array([180-hsens,smin,vmin]), np.array([180,smax,vmax])]]
-    red_ranges = hsv_range(hc, hsens, smin, smax, vmin, vmax)
-    return red_ranges
+    red_range = hsv_range(hc, hsens, smin, smax, vmin, vmax)
+    return red_range
 # Yellow is centered on h=30
 def hsv_yellow_range(hsens=10, smin=100, smax=255, vmin=100, vmax=255):
     return hsv_range(30, hsens, smin, smax, vmin, vmax)
@@ -281,7 +321,7 @@ def hsv_range(hcenter, hsens, smin, smax, vmin, vmax):
 
 class StartFinishDetector:
     def __init__(self):
-        self.red_ccf = ColoredContourDetector(hsv_red_ranges())
+        self.red_ccf = ColoredContourDetector(hsv_red_range())
         self.green_ccf = ColoredContourDetector(hsv_green_range(), min_area=100)
         
     def process_image(self, bgr_img):
@@ -386,11 +426,13 @@ class Pipeline:
         self.max_proc = np.max([self.max_proc, self.last_processing_duration])
         self.lp_proc = self.k_lp*self.lp_proc+(1-self.k_lp)*self.last_processing_duration
 
-    def draw_timing(self, img, y0=40, dy=50):
-        f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (0, 255, 0), 2
-        cv2.putText(img, 'fps: {:.1f} ( min {:.1f} max {:.1f})'.format(self.lp_fps, self.min_fps, self.max_fps), (20, y0), f, h, c, w)
-        cv2.putText(img, 'skipped: {:d}'.format(self.skipped_frames), (20, y0+dy), f, h, c, w)
-        try: cv2.putText(img, 'proc : {:.3f}/{:.3f}s'.format(self.lp_proc, 1./self.lp_fps), (20, y0+2*dy), f, h, c, w)
+    def draw_timing(self, img, x0=280, y0=20, dy=35, h=0.75, color_bgr=(220, 220, 50)):
+        f, c, w = cv2.FONT_HERSHEY_SIMPLEX, color_bgr, 2
+        try: 
+            txt = 'fps: {:.1f} (min {:.1f} max {:.1f})'.format(self.lp_fps, self.min_fps, self.max_fps)
+            cv2.putText(img, txt, (x0, y0), f, h, c, w)
+            txt = 'skipped: {:d} (cpu {:.3f}/{:.3f}s)'.format(self.skipped_frames, self.lp_proc, 1./self.lp_fps)
+            cv2.putText(img, txt, (x0, y0+dy), f, h, c, w)
         except AttributeError: pass
         
 

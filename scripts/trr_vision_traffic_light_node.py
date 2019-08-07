@@ -13,7 +13,8 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
     def __init__(self):
         trr_rpu.TrrSimpleVisionPipeNode.__init__(self, trr_tl.TrafficLightPipeline, self.pipe_cbk)
         self.traffic_light_pub = trr_rpu.TrrTrafficLightPublisher()
-        self.img_pub = trr_rpu.ImgPublisher(self.cam, '/trr_vision/traffic_light/image_debug')
+        #self.img_pub = trr_rpu.ImgPublisher(self.cam, '/trr_vision/traffic_light/image_debug')
+        self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/traffic_light/image_debug')
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_traffic_lightConfig, self.cfg_callback)
 
     def cfg_callback(self, cfg, level):
@@ -21,9 +22,9 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         #print cfg, level
         self.pipeline.set_debug_display(cfg['display_mode'], cfg['show_hud'])
         #pdb.set_trace()
-        self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax)
+        self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax, cfg.g_gthr)
 
-        self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax)
+        self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax, cfg.r_gthr)
 
         x, y, dx, dy = cfg.roi_xc, cfg.roi_yc, cfg.roi_dx, cfg.roi_dy
         tl, br = (x-dx/2, y-dy/2), (x+dx/2, y+dy/2)

@@ -16,6 +16,20 @@ class ImgPublisher:
     def publish(self, pipe, cam):
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(pipe.draw_debug(cam), "rgb8"))
 
+class CompressedImgPublisher:
+    def __init__(self, cam, img_topic):
+        rospy.loginfo(' publishing image on ({})'.format(img_topic))
+        self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
+        
+    def publish(self, pipe, cam):
+        img_rgb = pipe.draw_debug(cam)
+        img_bgr =  cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+        msg = sensor_msgs.msg.CompressedImage()
+        msg.header.stamp = rospy.Time.now()
+        msg.format = "jpeg"
+        msg.data = np.array(cv2.imencode('.jpg', img_bgr)[1]).tostring()
+        self.image_pub.publish(msg)
+
         
 class ContourPublisher:
     def __init__(self, frame_id='caroline/base_link_footprint', topic='/follow_line/detected_contour',
@@ -110,7 +124,7 @@ class TrrTrafficLightPublisher:
         self.pub = rospy.Publisher(topic, two_d_guidance.msg.TrrTrafficLight, queue_size=1)
     def publish(self, pl):
         msg = two_d_guidance.msg.TrrTrafficLight()
-        msg.red = pl.red_ctr_detc.has_contour()
+        msg.red = pl.sees_red()
         msg.yellow = False#pl.red_ctr_detc.has_contour()
         msg.green = pl.green_ctr_detc.has_contour()
         self.pub.publish(msg)
