@@ -77,7 +77,8 @@ class Node:
                     else:
                         self.cur_lap += 1 # or we pass to next lap
         elif self.mode == Node.mode_ready:
-            if self.traffic_light_sub.get()[2]: # green light, we race
+            tl_red, _, tl_green = self.traffic_light_sub.get()
+            if tl_green and not tl_red : # green light and no red, we race
                 self.update_race_mode(Node.mode_racing)
                     
     def set_guidance_mode(self, mode):

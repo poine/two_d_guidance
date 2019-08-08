@@ -9,7 +9,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam, be_param=trr_vu.BirdEyeParam()):
         trr_vu.Pipeline.__init__(self)
-        self.set_roi((0, 130), (cam.w, cam.h))
+        self.set_roi((0, 80), (cam.w, cam.h))
         self.thresholder = trr_vu.BinaryThresholder()
         self.contour_finder = trr_vu.ContourFinder()
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)

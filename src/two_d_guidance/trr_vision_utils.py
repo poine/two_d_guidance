@@ -66,12 +66,12 @@ class BirdEyeTransformer:
         self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h))
         return self.unwarped_img
 
-    def draw_debug(self, cam, img=None, lane_model=None, cnt_be=None, border_color=0.4, fill_color=(255, 0, 255)):
+    def draw_debug(self, cam, img=None, lane_model=None, cnt_be=None, border_color=128, fill_color=(255, 0, 255)):
         if img is None:
             img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
         elif img.dtype == np.uint8:
             img = img.astype(np.float32)/255.
-        out_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.float32)
+        out_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.uint8)
         scale = min(float(cam.h)/self.h, float(cam.w)/self.w)
         h, w = int(scale*self.h), int(scale*self.w)
         dx = (cam.w-w)/2
