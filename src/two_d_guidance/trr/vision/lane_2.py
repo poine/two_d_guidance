@@ -19,7 +19,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.cnt_max_be = None
 
     def set_roi(self, tl, br):
-        print('roi: {}'.format(tl, br))
+        print('roi: {} {}'.format(tl, br))
         self.tl, self.br = tl, br
         self.roi_h, self.roi_w = self.br[1]-self.tl[1], self.br[0]-self.tl[0]
         self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
@@ -30,8 +30,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.img_gray = cv2.cvtColor(self.img_roi, cv2.COLOR_BGR2GRAY )
         self.thresholder.process(self.img_gray)
         self.contour_finder.process(self.thresholder.threshold)
-        if self.contour_finder.cnt_max is not None:
-            cnt_max_noroi = self.contour_finder.cnt_max + self.tl
+        if self.contour_finder.has_contour():
+            cnt_max_noroi = self.contour_finder.get_contour() + self.tl
             cnt_max_imp = cam.undistort_points(cnt_max_noroi.astype(np.float32))
             #cnt_max_imp = cam.undistort_points2(self.contour_finder.cnt_max.astype(np.float32)) # TODO
             self.cnt_max_be = self.bird_eye.points_imp_to_be(cnt_max_imp)

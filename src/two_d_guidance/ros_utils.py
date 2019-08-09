@@ -1,5 +1,7 @@
 import math, numpy as np, scipy, rospy, geometry_msgs.msg, nav_msgs.msg, tf, pickle
 
+import smocap.utils
+
 def list_of_xyz(p): return [p.x, p.y, p.z]
 def array_of_xyz(p): return np.array(list_of_xyz(p))
 def list_of_xyzw(q): return [q.x, q.y, q.z, q.w]
@@ -60,3 +62,11 @@ class GazeboTruthListener:
         y = tf.transformations.euler_from_quaternion(list_of_xyzw(self.pose.orientation))[2]
         return l, y
  
+    def get_bl_to_world_T(self, max_delay=0.2):
+        if self.ts is None:
+            raise RobotNotLocalizedException
+        if rospy.Time.now().to_sec() - self.ts > max_delay:
+            raise RobotLostException
+        t, q = array_of_xyz(self.pose.position), list_of_xyzw(self.pose.orientation)
+        T = smocap.utils.T_of_t_q(t, q)
+        return T

@@ -71,7 +71,7 @@ class Node:
             if self.start_finish_sub.viewing_finish():
                 start_points, finish_points, dist_to_finish = self.start_finish_sub.get()
                 rospy.loginfo('racing and viewing finish {}'.format(dist_to_finish))
-                if dist_to_finish < 0.16: # we're close enough to finish
+                if dist_to_finish < 0.2: # we're close enough to finish
                     if self.cur_lap == self.nb_lap: # we brake
                         self.update_race_mode(Node.mode_finished)
                     else:

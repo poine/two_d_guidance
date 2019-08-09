@@ -8,115 +8,89 @@ import pdb
 #import smocap
 import smocap.rospy_utils
 
-import two_d_guidance.trr_utils as trru, two_d_guidance.trr_vision_utils as trrvu
+import two_d_guidance.trr_utils as trru, two_d_guidance.trr_vision_utils as trr_vu
 import two_d_guidance.trr_rospy_utils as trr_rpu
 import two_d_guidance.trr.vision.lane_1 as trr_l1
 import two_d_guidance.trr.vision.lane_2 as trr_l2
 
 import two_d_guidance.cfg.trr_vision_laneConfig
 
-class ImgPublisher:
-    def __init__(self, cam_sys, img_topic):
-        self.publish_compressed = True
-        rospy.loginfo(' publishing image on ({})'.format(img_topic))
-        if self.publish_compressed:
-            self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
-        else:
-            self.image_pub = rospy.Publisher(img_topic, sensor_msgs.msg.Image, queue_size=1)
-            self.bridge = cv_bridge.CvBridge()
-        self.cam_sys = cam_sys
-        w, h = np.sum([cam.w for cam in  cam_sys.get_cameras()]), np.max([cam.h for cam in cam_sys.get_cameras()])
-        self.img = 255*np.ones((h, w, 3), dtype='uint8')
+# class ImgPublisher:
+#     def __init__(self, cam_sys, img_topic):
+#         self.publish_compressed = True
+#         rospy.loginfo(' publishing image on ({})'.format(img_topic))
+#         if self.publish_compressed:
+#             self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
+#         else:
+#             self.image_pub = rospy.Publisher(img_topic, sensor_msgs.msg.Image, queue_size=1)
+#             self.bridge = cv_bridge.CvBridge()
+#         self.cam_sys = cam_sys
+#         w, h = np.sum([cam.w for cam in  cam_sys.get_cameras()]), np.max([cam.h for cam in cam_sys.get_cameras()])
+#         self.img = 255*np.ones((h, w, 3), dtype='uint8')
         
-    def publish(self, imgs, pipeline):
-        x0 = 0
-        for cam, img in zip(self.cam_sys.get_cameras(), imgs):
-            if  img is not None:
-                h, w = img.shape[0], img.shape[1]; x1 = x0+w
-                self.img[:h,x0:x1] = pipeline.draw_debug(cam, img)
-                x0 = x1
-        if self.publish_compressed:
-            msg = sensor_msgs.msg.CompressedImage()
-            msg.header.stamp = rospy.Time.now()
-            msg.format = "jpeg"
-            msg.data = np.array(cv2.imencode('.jpg', self.img)[1]).tostring()
-            self.image_pub.publish(msg)
-        else:
-            self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.img, "rgb8"))
+#     def publish(self, imgs, pipeline):
+#         x0 = 0
+#         for cam, img in zip(self.cam_sys.get_cameras(), imgs):
+#             if  img is not None:
+#                 h, w = img.shape[0], img.shape[1]; x1 = x0+w
+#                 self.img[:h,x0:x1] = pipeline.draw_debug(cam, img)
+#                 x0 = x1
+#         if self.publish_compressed:
+#             msg = sensor_msgs.msg.CompressedImage()
+#             msg.header.stamp = rospy.Time.now()
+#             msg.format = "jpeg"
+#             msg.data = np.array(cv2.imencode('.jpg', self.img)[1]).tostring()
+#             self.image_pub.publish(msg)
+#         else:
+#             self.image_pub.publish(self.bridge.cv2_to_imgmsg(self.img, "rgb8"))
 
 
 
 
 class BirdEyePublisher(trr_rpu.ContourPublisher):
-    def __init__(self, frame_id, be, topic='follow_line/bird_eye'):
+    def __init__(self, frame_id, be, topic='trr_vision/lane/bird_eye'):
         trr_rpu.ContourPublisher.__init__(self, frame_id, topic, be.param.va_bf, rgba=(1.,0.,0.,1.))
         
 
 '''
 
 '''
-class Node:
+class Node(trr_rpu.TrrSimpleVisionPipeNode):
 
     def __init__(self):
-        self.low_freq = 10.
-        robot_name = rospy.get_param('~robot_name', '')
-        def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
-        cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera_road_front')).split(',')
-        ref_frame = rospy.get_param('~ref_frame', prefix(robot_name, 'base_link_footprint'))
-        # Camera System
-        if 1:
-            self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(cam_names, fetch_extrinsics=True, world=ref_frame)
-        else:
-            self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(cam_names, fetch_extrinsics=False, world=ref_frame)
-            world_to_camo_t = [ 0.00039367,  0.3255541,  -0.04368782]
-            world_to_camo_q = [ 0.6194402,  -0.61317113,  0.34761617,  0.34565589]
-            self.cam_sys.cameras[0].set_location(world_to_camo_t, world_to_camo_q)
-        self.cam_sys.cameras[0].set_undistortion_param(alpha=1.)
-        # Pipeline
-        pipe=2
-        if pipe == 1: self.pipeline = trr_l1.Contour1Pipeline(self.cam_sys.cameras[0])
-        elif pipe == 2:
-            self.pipeline = trr_l2.Contour2Pipeline(self.cam_sys.cameras[0], trrvu.CarolineBirdEyeParam())
-            self.pipeline.display_mode = trr_l2.Contour2Pipeline.show_be
-        elif pipe == 3:
-            self.pipeline = trrvu.Foo3Pipeline(self.cam_sys.cameras[0])
+        pipe_type = 1
+        pipe_classes = [trr_l1.Contour1Pipeline, trr_l2.Contour2Pipeline, trr_vu.Foo3Pipeline]
+        trr_rpu.TrrSimpleVisionPipeNode.__init__(self, pipe_classes[pipe_type], self.pipe_cbk)
+        try:
+            self.pipeline.bird_eye.set_param(self.cam, trr_vu.CarolineBirdEyeParam())
+        except AttributeError: rospy.loginfo("  NoBE")
+   
         # Publishing
         # Image
-        self.img_pub = ImgPublisher(img_topic='/trr_vision/lane/image_debug', cam_sys=self.cam_sys)
+        self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/lane/image_debug')
         # Markers
-        self.cont_pub = trr_rpu.ContourPublisher(topic='/trr_vision/lane/detected_contour_markers', frame_id=ref_frame)
-        self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, ref_frame, '/trr_vision/lane/fov')
+        self.cont_pub = trr_rpu.ContourPublisher(topic='/trr_vision/lane/detected_contour_markers', frame_id=self.ref_frame)
+        self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, self.ref_frame, '/trr_vision/lane/fov')
         try:
-            self.be_pub = BirdEyePublisher(ref_frame, self.pipeline.bird_eye, '/trr_vision/lane/bird_eye')
+            self.be_pub = BirdEyePublisher(self.ref_frame, self.pipeline.bird_eye, '/trr_vision/lane/bird_eye')
         except AttributeError:
             self.be_pub = None
-        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=ref_frame)
+        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=self.ref_frame)
         # Model
         self.lane_model_pub = trru.LaneModelPublisher('/trr_vision/lane/detected_model')
         self.lane_model = trru.LaneModel()
-        self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_laneConfig, self.cfg_callback)
 
     def cfg_callback(self, config, level):
         rospy.loginfo("  Reconfigure Request:")
-        #pdb.set_trace()
-        print config, level
-        #rospy.loginfo("  Reconfigure Request: {int_param}, {lookahead}, {str_param}, {bool_param}, {size}".format(**config))
         self.pipeline.thresholder.set_threshold(config['mask_threshold'])
         self.pipeline.display_mode = config['display_mode']
         return config
 
-    
-    def on_image(self, img, (cam_idx, stamp, seq)):
-        #pdb.set_trace()
-        #print(img.dtype)
-        self.pipeline.process_image(img, self.cam_sys.cameras[cam_idx], stamp, seq)
+    def pipe_cbk(self):
         if self.pipeline.lane_model.is_valid():
             self.lane_model_pub.publish(self.pipeline.lane_model)
             
-    def publish_image(self):
-        self.img_pub.publish(self.cam_lst.get_images_as_rgb(), self.pipeline)
-
     def publish_3Dmarkers(self):
         #self.fov_pub.publish()
         if self.be_pub is not None:
@@ -128,7 +102,8 @@ class Node:
             
     def periodic(self):
         if  self.pipeline.display_mode != self.pipeline.show_none:
-            self.publish_image()
+            self.img_pub.publish(self.pipeline, self.cam)
+            #self.publish_image()
         self.publish_3Dmarkers()
     
     def run(self):
@@ -143,7 +118,7 @@ class Node:
 def main(args):
     name = 'trr_vision_lane_node'
     rospy.init_node(name)
-    rospy.loginfo('{name} starting')
+    rospy.loginfo('{} starting'.format(name))
     rospy.loginfo('  using opencv version {}'.format(cv2.__version__))
     Node().run()
 

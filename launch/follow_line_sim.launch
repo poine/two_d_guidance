@@ -76,6 +76,7 @@
 
   <!--  ****** Start Finish detection *****  -->
   <group if="$(arg start_trr_start_finish)">
+    <rosparam command="load" file="$(find roverboard_caroline)/config/trr_sim.yaml" />
     <node name="trr_vision_start_finish_node" pkg="two_d_guidance" type="trr_vision_start_finish_node.py">
       <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
@@ -85,8 +86,9 @@
 
   <!--  ****** Traffic Light detection *****  -->
   <group if="$(arg start_trr_traffic_light)">
+    <rosparam command="load" file="$(find roverboard_caroline)/config/trr_sim.yaml" />
     <node name="trr_vision_traffic_light_node" pkg="two_d_guidance" type="trr_vision_traffic_light_node.py">
-      <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
+      <param name="cameras" value="$(arg robot_name)/camera_horiz_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
     </node>
   </group>
@@ -96,10 +98,8 @@
     <node name="trr_race_manager_node" pkg="two_d_guidance" type="trr_race_manager.py">
       <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
-      <param name="mask_threshold" value="180"/>
     </node>
   </group>
-
   
   <!--  ****** Lane guidance *****  -->
   <group if="$(arg start_trr_guidance)">

@@ -44,21 +44,21 @@ class CarolineBirdEyeParam(BirdEyeParam):
 
         
 class BirdEyeTransformer:
-    def __init__(self, cam, param):
-        self.param = param
-        self.calibrate(cam, param)
+    def __init__(self, cam, be_param):
+        self.set_param(cam, be_param)
         self.cnt_fp = None
         self.unwarped_img = None
         
-    def calibrate(self, cam, param):
-        self.w, self.h = param.w, param.h
-        va_img = cam.project(param.va_bf)
+    def set_param(self, cam, be_param):
+        self.param = be_param
+        self.w, self.h = be_param.w, be_param.h
+        va_img = cam.project(be_param.va_bf)
         self.va_img_undistorted = cam.undistort_points(va_img).astype(int).squeeze()
         pts_src = self.va_img_undistorted
         pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
         self.H, status = cv2.findHomography(pts_src, pts_dst)
         print('calibrated bird eye: {} {}'.format(status, self.H))
-
+        
     def plot_calibration(self, img_undistorted):
         pass
         
@@ -208,7 +208,11 @@ class ContourFinder:
         self.cnt_max = None
         self.cnt_max_area = 0
         self.min_area = min_area
-        
+
+    def has_contour(self): return (self.cnt_max is not None)
+    def get_contour(self): return self.cnt_max
+    def get_contour_area(self): return self.cnt_max_area
+    
     def process(self, img):
         self.img2, cnts, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
         self.cnt_max = None
@@ -240,9 +244,9 @@ class ColoredContourDetector:
     def set_gray_threshold(self, v): 
         self.mask_extractor.set_threshold(v)
         
-    def has_contour(self): return (self.bin_ctr_finder.cnt_max is not None)
-    def get_contour(self): return self.bin_ctr_finder.cnt_max
-    def get_contour_area(self): return self.bin_ctr_finder.cnt_max_area
+    def has_contour(self): return self.bin_ctr_finder.has_contour()
+    def get_contour(self): return self.bin_ctr_finder.get_contour()
+    def get_contour_area(self): return self.bin_ctr_finder.get_contour_area()
         
     #def process_bgr_image(self, bgr_img): return self.process_hsv_image(cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV))
     #def process_rgb_image(self, rgb_img): return self.process_hsv_image(cv2.cvtColor(rgb_img, cv2.COLOR_RGB2HSV))
@@ -315,25 +319,27 @@ def hsv_range(hcenter, hsens, smin, smax, vmin, vmax):
     else:
         ranges.append([np.array([hmin, smin, vmin]), np.array([hmax, smax, vmax])])
     return ranges
-    #return [[np.array([hcenter-hsens, smin, vmin]), np.array([hcenter+hsens, smax, vmax])]]
-
     
 
 class StartFinishDetector:
     def __init__(self):
-        self.red_ccf = ColoredContourDetector(hsv_red_range())
+        self.red_ccf = ColoredContourDetector(hsv_red_range(), min_area=100)
         self.green_ccf = ColoredContourDetector(hsv_green_range(), min_area=100)
+
+    def sees_start(self): return self.green_ccf.has_contour()
+    def sees_finish(self): return self.red_ccf.has_contour()
         
     def process_image(self, bgr_img):
         hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
-        self.red_ccf.process_hsv_image(hsv)
-        self.green_ccf.process_hsv_image(hsv)
+        gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+        self.red_ccf.process_hsv_image(hsv, gray)
+        self.green_ccf.process_hsv_image(hsv, gray)
  
     def draw(self, bgr_img):
         gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
         bgr_img2 = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
-        self.red_ccf.draw(bgr_img2, color=(255,0,0))
-        self.green_ccf.draw(bgr_img2, color=(0,255,0))
+        self.red_ccf.draw(bgr_img2, color=(155, 155, 0), fill_color=(0,0,255))
+        self.green_ccf.draw(bgr_img2, color=(155, 155, 0), fill_color=(0, 255,0))
         return bgr_img2
 
 
@@ -394,7 +400,7 @@ class FloorPlaneInjector:
         # contour projected on floor plane (in body frame)
         self.contour_floor_plane_blf = np.array([np.dot(cam.cam_to_world_T[:3], p.tolist()+[1]) for p in contour_floor_plane_cam])
 
-
+# Timing of pipelines
 class Pipeline:
     def __init__(self):
         self.skipped_frames = 0
@@ -418,9 +424,11 @@ class Pipeline:
         if self.last_seq is not None:
             self.skipped_frames += seq-self.last_seq-1
         self.last_seq = seq
+
         _start = time.time()
         self._process_image(img, cam)
         _end = time.time()
+
         self.last_processing_duration = _end-_start
         self.min_proc = np.min([self.min_proc, self.last_processing_duration])
         self.max_proc = np.max([self.max_proc, self.last_processing_duration])
@@ -464,39 +472,4 @@ class Foo3Pipeline(Pipeline):
         #    print(self.undistorted_img.dtype, self.bird_eye.unwarped_img.dtype)
         return img_out
 
-    
-
-def plot(lf):
-    
-    #plt.subplot(221), plt.imshow(lf.inputImageGray, cmap = 'gray')
-    #plt.title('camera')
-    #plt.subplot(222), plt.imshow(lf.edges, cmap = 'gray')
-    #plt.title('edges')
-    be_calib_img = cv2.cvtColor(lf.inputImageGray, cv2.COLOR_GRAY2BGR)
-    be_calib_img = lf.bird_eye.plot_calibration(be_calib_img)
-    plt.subplot(221), plt.imshow(be_calib_img)
-    
-    plt.subplot(222), plt.imshow(lf.bird_eye.unwarped_img, cmap = 'gray')
-    plt.title('bird eye')
-    
-    plt.subplot(223), plt.imshow(lf.edges_cropped, cmap = 'gray')
-    plt.title('edges cropped')
-    result_img = lane_finder.draw(lf.inputImageGray, None)
-    plt.subplot(224), plt.imshow(result_img, cmap = 'gray')
-    plt.title('result')
-    plt.show()
-    
-    
-if __name__ == '__main__':
-    #img = cv2.imread('/home/poine/work/robot_data/oscar/gazebo_lines/image_01.png', cv2.IMREAD_UNCHANGED)
-    #img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    #img_gray =  cv2.imread('/home/poine/work/robot_data/oscar/gazebo_lines/image_07.png', cv2.IMREAD_GRAYSCALE)
-    img_gray =  cv2.imread('/home/poine/work/robot_data/jeanmarie/image_02.png', cv2.IMREAD_GRAYSCALE)
-    
-    lane_finder = LaneFinder()
-    lane_finder.process_image(img_gray, 0)
-
-    plot(lane_finder)
-    #cv2.imshow('follow line', img_gray)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
+ 

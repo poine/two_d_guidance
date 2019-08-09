@@ -18,7 +18,7 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         
         self.set_roi((150, 15), (300, 100))
         self.set_debug_display(TrafficLightPipeline.show_none, False)
-        self.font = PIL.ImageFont.truetype("FreeMono.ttf", 30)  
+        self.pil_font = PIL.ImageFont.truetype("FreeMono.ttf", 30)  
 
     def set_debug_display(self, display_mode, show_hud):
         self.display_mode, self.show_hud = display_mode, show_hud
@@ -96,22 +96,29 @@ class TrafficLightPipeline(trr_vu.Pipeline):
                 dx, dy = (cam.w-w)/2, (cam.h-h)/2
                 out_img[dy:dy+h, dx:dx+w] = cv2.resize(out_roi, (w, h))
             
-        if self.show_hud:
-            self.draw_timing(out_img, y0=30)
-            sta_red =   'red   : area: {}'.format(self.red_ctr_detc.get_contour_area()) if self.sees_red()     else 'red:   not detected'
-            sta_green = 'green : area: {}'.format(self.green_ctr_detc.get_contour_area()) if self.sees_green() else 'green: not detected'
-            if 0:
-                # this is blue, so out_img is BGR
-                f, h, c, w = cv2.FONT_HERSHEY_PLAIN, 1.25, (106, 224, 48), 2
-                cv2.putText(out_img, 'Traffic light', (20, 40), f, h, c, w)
-                cv2.putText(out_img, sta_red, (20, 390), f, h, c, w)
-                cv2.putText(out_img, sta_green, (20, 440), f, h, c, w)
-            else:
-                im_pil = PIL.Image.fromarray(out_img)
-                draw = PIL.ImageDraw.Draw(im_pil)
-                draw.text((10, 10), 'Traffic light', font=self.font)
-                draw.text((10, 410), sta_red, font=self.font)
-                draw.text((10, 440), sta_green, font=self.font)
-                out_img = np.array(im_pil)
+        if self.show_hud: out_img = self.draw_hud(out_img)
         # we return a RGB image
         return cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
+
+
+    def draw_hud(self, out_img):
+        self.draw_timing(out_img, y0=30)
+        sta_red =   'red   : area: {}'.format(self.red_ctr_detc.get_contour_area()) if self.sees_red()     else 'red:   not detected'
+        sta_green = 'green : area: {}'.format(self.green_ctr_detc.get_contour_area()) if self.sees_green() else 'green: not detected'
+        if 0:
+            # this is blue, so out_img is BGR
+            f, h, c, w = cv2.FONT_HERSHEY_PLAIN, 1.25, (106, 224, 48), 2
+            cv2.putText(out_img, 'Traffic light', (20, 40), f, h, c, w)
+            cv2.putText(out_img, sta_red, (20, 390), f, h, c, w)
+            cv2.putText(out_img, sta_green, (20, 440), f, h, c, w)
+        else:
+            im_pil = PIL.Image.fromarray(out_img)
+            draw = PIL.ImageDraw.Draw(im_pil)
+            #font_color = (255,0,0) # blue
+            font_color = (0,0,255) # red
+            draw.text((10, 10), 'Traffic light', font=self.pil_font, fill=font_color)
+            draw.text((10, 410), sta_red, font=self.pil_font, fill=font_color)
+            draw.text((10, 440), sta_green, font=self.pil_font, fill=font_color)
+            out_img = np.array(im_pil)
+        return out_img
+    

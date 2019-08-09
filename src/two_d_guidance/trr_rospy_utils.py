@@ -78,13 +78,13 @@ class TrrStartFinishPublisher:
 
     def publish(self, pl):
         msg = two_d_guidance.msg.TrrStartFinish()
-        if pl.green_ctr_lfp is not None:
-            for (x, y, z) in pl.green_ctr_lfp:
+        if pl.ss_dtc.sees_start():
+            for (x, y, z) in pl.start_ctr_lfp:
                p = geometry_msgs.msg.Point()
                p.x=x; p.y=y;p.z=z
                msg.start_points.append(p)
-        if pl.red_ctr_lfp is not None:
-            for (x, y, z) in pl.red_ctr_lfp:
+        if pl.ss_dtc.sees_finish():
+            for (x, y, z) in pl.finish_ctr_lfp:
                p = geometry_msgs.msg.Point()
                p.x=x; p.y=y;p.z=z
                msg.finish_points.append(p)
@@ -162,9 +162,13 @@ class TrrSimpleVisionPipeNode:
 
     # we get a bgr8 image as input
     def on_image(self, img, (cam_idx, stamp, seq)):
-        #img_bgr = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img_bgr = img
+        #sim = True
+        #if sim: # gazebo provides rgb
+        #    img_bgr = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #else:   # ueye provide bgr
+        #    img_bgr = img
         #img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img_bgr = img
         self.pipeline.process_image(img_bgr, self.cam_sys.cameras[cam_idx], stamp, seq)
         if self.pipe_cbk is not None: self.pipe_cbk()
         
