@@ -31,7 +31,7 @@ class Node:
 
         self.start_finish_sub = trr_rpu.TrrStartFinishSubscriber(user_callback=self.on_start_finish)
         self.traffic_light_sub = trr_rpu.TrrTrafficLightSubscriber()
-        self.odom_sub = trr_rpu.OdomListener(callback=self.on_odom)
+        self.odom_sub = trr_rpu.OdomListener(odom_topic='/caroline_robot_hardware/diff_drive_controller/odom', callback=self.on_odom)
 
 
     def on_odom(self, msg):

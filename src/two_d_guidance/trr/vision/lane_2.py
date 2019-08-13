@@ -9,7 +9,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam, be_param=trr_vu.BirdEyeParam()):
         trr_vu.Pipeline.__init__(self)
-        self.set_roi((0, 0), (cam.w, cam.h))
+        #self.set_roi((0, 0), (cam.w, cam.h))
+        self.set_roi((0, 70), (cam.w, cam.h))
         self.thresholder = trr_vu.BinaryThresholder()
         self.contour_finder = trr_vu.ContourFinder(min_area = 100)
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)
@@ -39,13 +40,14 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.lane_model.fit(self.cnt_max_lfp[:,:2])
             self.lane_model.set_valid(True)
 
-            self.cnts_be, self.cnts_lfp = [], []
-            for c in self.contour_finder.valid_cnts:
-                cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
-                cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
-                self.cnts_be.append(cnt_be)
-                cnt_lfp = self.bird_eye.unwarped_to_fp(cam, cnt_be)
-                self.cnts_lfp.append(cnt_lfp)
+            if 0:
+                self.cnts_be, self.cnts_lfp = [], []
+                for c in self.contour_finder.valid_cnts:
+                    cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
+                    cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
+                    self.cnts_be.append(cnt_be)
+                    cnt_lfp = self.bird_eye.unwarped_to_fp(cam, cnt_be)
+                    self.cnts_lfp.append(cnt_lfp)
             
         else:
             self.lane_model.set_valid(False)
