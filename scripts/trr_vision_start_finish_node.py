@@ -5,9 +5,9 @@ import cv2#, cv_bridge
 import pdb
 
 import smocap.rospy_utils
-import two_d_guidance.trr_utils as trru
-import two_d_guidance.trr_vision_utils as trr_vu
-import two_d_guidance.trr_rospy_utils as trr_rpu
+import two_d_guidance.trr.utils as trru
+import two_d_guidance.trr.vision.utils as trr_vu
+import two_d_guidance.trr.rospy_utils as trr_rpu
 import two_d_guidance.trr.vision.start_finish as trr_vsf
 
 import two_d_guidance.cfg.trr_vision_start_finishConfig

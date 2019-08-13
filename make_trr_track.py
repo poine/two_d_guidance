@@ -2,24 +2,26 @@
 # -*- coding: utf-8 -*-
 import sys, os, logging, numpy as np, matplotlib.pyplot as plt
 import two_d_guidance as tdg
+import pdb
 
-def make_real_path():
+def make_real_path(res=0.01):
    _dir = '/home/poine/work/two_d_guidance/paths/demo_z'
-   x0, x1 = -0.75, 2.25
+   #x0, x1 = -0.75, 2.25
+   x0, x1 = 0., 2.25  # moved start of path to center
    c1, r = [x1,0], 1.25
-   line1 = tdg.make_line_path([x0, r], [x1, r], n_pt=100)
-   circle1 = tdg.make_circle_path(c1, -r, np.pi/2, np.pi, n_pt=180)
+   line1 = tdg.make_line_path([x0, r], [x1, r], res=res)
+   circle1 = tdg.make_circle_path(c1, -r, np.pi/2, np.pi, res=res)
    x2, y2 = 1.581, -0.35
-   line2 = tdg.make_line_path([x1, -r], [x2, -r], n_pt=50)
+   line2 = tdg.make_line_path([x1, -r], [x2, -r], res=0.01)
    c2, r2, th2 = [x2, y2], 0.9, np.deg2rad(61.8)
-   circle2 = tdg.make_circle_path(c2, r2, -np.pi/2, -th2, n_pt=90)
+   circle2 = tdg.make_circle_path(c2, r2, -np.pi/2, -th2, res=res)
    c3, r3 = [0, -1.21], 0.9
-   circle3 = tdg.make_circle_path(c3, r3, np.pi/2-th2, 2*th2, n_pt=90)
+   circle3 = tdg.make_circle_path(c3, r3, np.pi/2-th2, 2*th2, res=res)
    c4, r4 = [-x2, y2], 0.9
-   circle4 = tdg.make_circle_path(c4, r4, -(np.pi/2-th2), -th2, n_pt=90)
-   line3 = tdg.make_line_path([-x1, -r], [-x2, -r], n_pt=50)
-   circle5 = tdg.make_circle_path([-x1, 0], -r, -np.pi/2, np.pi, n_pt=180)
-   line4 = tdg.make_line_path([-x1, r], [x0, r], n_pt=50)
+   circle4 = tdg.make_circle_path(c4, r4, -(np.pi/2-th2), -th2, res=res)
+   line3 = tdg.make_line_path([-x2, -r], [-x1, -r], res=res)
+   circle5 = tdg.make_circle_path([-x1, 0], -r, -np.pi/2, np.pi, res=res)
+   line4 = tdg.make_line_path([-x1, r], [x0, r], res=res)
    line1.append([circle1, line2, circle2, circle3, circle4, line3, circle5, line4])
    p = line1
    fname = os.path.join(_dir, 'track_trr_real.npz')
@@ -30,8 +32,6 @@ def make_real_path():
 
 def make_small2_path():
    _dir = '/home/poine/work/two_d_guidance/paths/demo_z'
-
-
    x0, x1 = -0.75, 5
    c1, r = [x1,0], 1.75
    line1 = tdg.make_line_path([x0, r], [x1, r], n_pt=100)

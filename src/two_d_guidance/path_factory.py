@@ -11,8 +11,14 @@ import pdb
 def pt_on_ellipse(a, b, th):
     return np.stack([a*np.cos(th), b*np.sin(th)], axis=-1)
 
-def make_line_path(p0, p1, n_pt=10):
+def make_line_path(p0, p1, n_pt=10, res=None):
     _path = path.Path()
+    if res is not None:
+        disp = np.array(p1)-p0
+        dist = np.linalg.norm(disp)
+        #pdb.set_trace()
+        n_pt = int(dist/res)
+        #print(' npt {}'.format(n_pt))
     _pts = np.stack([np.linspace(p0[i], p1[i], n_pt) for i in range(2)], axis=-1)
     disp = np.asarray(p1)-p0
     headings = np.arctan2(disp[1], disp[0])*np.ones(len(_pts))
@@ -21,13 +27,16 @@ def make_line_path(p0, p1, n_pt=10):
     _path.append_points(_pts, headings, dists, curvatures)
     return _path
 
-def make_circle_path(c, r, th0, dth, n_pt=10):
+def make_circle_path(c, r, th0, dth, n_pt=10, res=None):
     _path = path.Path()
+    if res is not None:
+        dist = abs(dth*r)
+        n_pt = int(dist/res)
     ths = np.linspace(th0, th0+np.sign(r)*dth, n_pt, endpoint=False)
     points = utils.pt_on_circle(c, np.abs(r), ths)
     headings = utils.normalize_headings(ths + np.sign(r)*np.pi/2)
     curvatures = 1./r*np.ones(n_pt)
-    dists = np.linspace(0, np.abs(r)*dth, n_pt)
+    dists = np.linspace(0, np.abs(r*dth), n_pt)
     _path.append_points(points, headings, dists, curvatures)
     return _path
 

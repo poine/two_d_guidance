@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
-import two_d_guidance.trr_vision_utils as trr_vu
-import two_d_guidance.trr_utils as trru
+import two_d_guidance.trr.vision.utils as trr_vu
+import two_d_guidance.trr.utils as trru
 
 class Contour1Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)

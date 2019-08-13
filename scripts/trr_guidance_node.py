@@ -4,20 +4,14 @@ import math, numpy as np
 import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg#, visualization_msgs.msg, sensor_msgs.msg
 
-import two_d_guidance.trr_utils as trru
+import two_d_guidance.trr.utils as trr_u
+import two_d_guidance.trr.rospy_utils as trr_ru
+
 import two_d_guidance.cfg.trr_guidanceConfig  # dynamic reconfigure
 
 import pdb
 
 
-class OdomListener:
-    def __init__(self, odom_topic = '/caroline/diff_drive_controller/odom'):
-        self.odom_sub = rospy.Subscriber(odom_topic, nav_msgs.msg.Odometry, self.callback)
-        self.lin, self.ang = 0, 0
-        
-    def callback(self, msg):
-        self.msg = msg
-        self.lin, self.ang = msg.twist.twist.linear.x, msg.twist.twist.angular.z
         
 
 class VelCtl:
@@ -61,7 +55,7 @@ class Guidance:
         self.vel_ctl = VelCtl()
         self.vel_sp = vel_sp
     
-    def compute(self, lane_model, expl_noise=0.025, dy=0.):
+    def compute(self, lane_model, expl_noise=0.025, dy=0.1):
         lin = self.vel_ctl.get(lane_model)
         self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
         self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
@@ -108,14 +102,14 @@ class Node:
         self.hf_loop_idx = 0
         self.low_freq_div = 6
         self.lin_sp, self.ang_sp = 0,0
-        self.lane_model = trru.LaneModel()
+        self.lane_model = trr_u.LaneModel()
         self.guidance = Guidance(lookahead=0.6)
         cmd_topic = rospy.get_param('~cmd_topic', '/nono_0/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
-        self.lane_model_sub = trru.LaneModelSubscriber('/trr_vision/lane/detected_model')
-        self.odom_sub = OdomListener()
+        self.lane_model_sub = trr_u.LaneModelSubscriber('/trr_vision/lane/detected_model')
+        self.odom_sub = trr_ru.OdomListener()
 
     def cfg_callback(self, config, level):
         rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead_dist}/{lookahead_time}, vel_setpoint: {vel_sp}".format(**config))

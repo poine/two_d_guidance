@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import PIL, PIL.ImageFont, PIL.ImageDraw
 
-import two_d_guidance.trr_vision_utils as trr_vu
+import two_d_guidance.trr.vision.utils as trr_vu
 import pdb
 
 class TrafficLightPipeline(trr_vu.Pipeline):
@@ -57,7 +57,8 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         
     def sees_red(self): return self.red_ctr_detc.has_contour()
     def sees_green(self): return self.green_ctr_detc.has_contour()
-        
+    def get_light_status(self): return self.sees_red(), False, self.sees_green()
+    
     def draw_debug(self, cam, img_cam=None, scale_roi=True, border_color=128):
         if self.img_bgr is None: # we have nothing to display, return a black image
             return np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
@@ -101,16 +102,16 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         return cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
 
 
-    def draw_hud(self, out_img):
+    def draw_hud(self, out_img, font_color=(0,0,255)): # red
         self.draw_timing(out_img, y0=30)
         sta_red =   'red   : area: {}'.format(self.red_ctr_detc.get_contour_area()) if self.sees_red()     else 'red:   not detected'
         sta_green = 'green : area: {}'.format(self.green_ctr_detc.get_contour_area()) if self.sees_green() else 'green: not detected'
         if 0:
             # this is blue, so out_img is BGR
-            f, h, c, w = cv2.FONT_HERSHEY_PLAIN, 1.25, (106, 224, 48), 2
-            cv2.putText(out_img, 'Traffic light', (20, 40), f, h, c, w)
-            cv2.putText(out_img, sta_red, (20, 390), f, h, c, w)
-            cv2.putText(out_img, sta_green, (20, 440), f, h, c, w)
+            f, h, c, w, y0 = cv2.FONT_HERSHEY_PLAIN, 1.25, font_color, 2
+            cv2.putText(out_img, 'Traffic light', (y0, 40), f, h, c, w)
+            cv2.putText(out_img, sta_red, (y0, 390), f, h, c, w)
+            cv2.putText(out_img, sta_green, (y0, 440), f, h, c, w)
         else:
             im_pil = PIL.Image.fromarray(out_img)
             draw = PIL.ImageDraw.Draw(im_pil)

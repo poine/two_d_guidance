@@ -3,8 +3,8 @@ import sys
 import rospy, dynamic_reconfigure.server, cv2
 import pdb
 
-import two_d_guidance.trr_vision_utils as trr_vu
-import two_d_guidance.trr_rospy_utils as trr_rpu
+import two_d_guidance.trr.vision.utils as trr_vu
+import two_d_guidance.trr.rospy_utils as trr_rpu
 import two_d_guidance.trr.vision.traffic_light as trr_tl
 
 import two_d_guidance.cfg.trr_vision_traffic_lightConfig
@@ -42,7 +42,7 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
 def main(args):
     name = 'trr_vision_traffic_light_node'
     rospy.init_node(name)
-    rospy.loginfo('{name} starting')
+    rospy.loginfo('{} starting'.format(name))
     rospy.loginfo('  using opencv version {}'.format(cv2.__version__))
     Node().run()
 

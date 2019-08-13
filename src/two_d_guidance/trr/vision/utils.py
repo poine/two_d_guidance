@@ -5,8 +5,17 @@ import cv2
 from matplotlib import pyplot as plt
 import yaml
 
-import two_d_guidance.trr_utils as trru, smocap
+import two_d_guidance.trr.utils as trr_u, smocap
 import pdb
+
+def change_canvas(img_in, out_h, out_w, border_color=128):
+    img_out = np.full((out_h, out_w, 3), border_color, dtype=np.uint8)
+    in_h, in_w, _ = img_in.shape
+    scale = min(float(out_h)/in_h, float(out_w)/in_w)
+    h, w = int(scale*in_h), int(scale*in_w)
+    dx, dy = (out_w-w)/2, (out_h-h)/2
+    img_out[dy:dy+h, dx:dx+w] = cv2.resize(img_in, (w, h))
+    return img_out
 
 def load_cam_from_files(intr_path, extr_path, cam_name='cam1', alpha=1.):
     cam = smocap.Camera(0, 'cam1')
@@ -71,19 +80,15 @@ class BirdEyeTransformer:
             img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
         elif img.dtype == np.uint8:
             img = img.astype(np.float32)/255.
-        out_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.uint8)
-        scale = min(float(cam.h)/self.h, float(cam.w)/self.w)
-        h, w = int(scale*self.h), int(scale*self.w)
-        dx = (cam.w-w)/2
         if  cnt_be is not None:
             cv2.drawContours(img, cnt_be, -1, (255,0,255), 3)
             cv2.fillPoly(img, pts =[cnt_be], color=fill_color)
         if lane_model is not None and lane_model.is_valid():
             self.draw_line(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
-        out_img[:h, dx:dx+w] = cv2.resize(img, (w, h))
+        out_img = change_canvas(img, cam.h, cam.w)
         return out_img
 
-    def draw_line(self, cam, img, lane_model, l0=0.6, l1=1.8):
+    def draw_line(self, cam, img, lane_model, l0=0.6, l1=1.8, color=(0,128,0)):
         # Coordinates in local_floor_plane(aka base_link_footprint) frame
         xs = np.linspace(l0, l1, 20); ys = lane_model.get_y(xs)
         pts_lfp = np.array([[x, y, 0] for x, y in zip(xs, ys)])
@@ -92,7 +97,7 @@ class BirdEyeTransformer:
         for i in range(len(pts_img)-1):
             try:
                 #print(tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)))
-                cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), (0,128,0), 4)
+                cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), color, 4)
             except OverflowError:
                 pass
 
@@ -111,21 +116,6 @@ class BirdEyeTransformer:
         cnt_uv = np.array([(self.param.w/2-y/s, self.param.h-(x-self.param.x0)/s) for x, y, _ in cnt_lfp])
         return cnt_uv
 
-    
-def region_of_interest(img, vertices):
-    mask = np.zeros_like(img)
-    cv2.fillPoly(mask, vertices, 255)
-    #cv2.fillPoly(mask, np.array([[(0, 0), (100, 100), (200,0)]], dtype=np.int32), 255)
-    masked_image = cv2.bitwise_and(img, mask)
-    return masked_image
-
-def region_of_interest_vertices(height, width, dh=0.25):
-    return np.array([[
-    (0, height),
-    (0.4*width, dh*height),
-    (0.6*width, dh*height),
-    (width, height),
-    ]], dtype=np.int32)
 
 
 class ColoredBlobDetector:
@@ -214,16 +204,21 @@ class ContourFinder:
     def get_contour_area(self): return self.cnt_max_area
     
     def process(self, img):
-        self.img2, cnts, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        self.img2, self.cnts, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
         self.cnt_max = None
-        if cnts is not None and len(cnts) > 0:
-            self.cnt_max = max(cnts, key=cv2.contourArea)
+        if self.cnts is not None and len(self.cnts) > 0:
+            self.cnt_max = max(self.cnts, key=cv2.contourArea)
             self.cnt_max_area = cv2.contourArea(self.cnt_max)
             if self.min_area is not None and self.cnt_max_area < self.min_area:
-               self.cnt_max = None
-               self.cnt_max_area = 0
-            
-    def draw(self, img, color=(255,0,0), thickness=3, fill=True, fill_color=(255,0,0)):
+               self.cnt_max, self.cnt_max_area = None, 0
+
+            self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
+            self.cnt_areas_order = np.argsort(self.cnt_areas)
+            self.valid_cnts_idx = self.cnt_areas > self.min_area
+            self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
+               
+               
+    def draw(self, img, color=(255,0,0), thickness=3, fill=True, fill_color=(255,0,0), draw_all=False):
         if self.cnt_max is not None:
             if fill:
                 try:
@@ -232,6 +227,10 @@ class ContourFinder:
                     #print self.cnt_max.shape
                     pass
             cv2.drawContours(img, self.cnt_max, -1, color, thickness)
+        if draw_all and self.valid_cnts is not None:
+            for c in self.valid_cnts:
+                cv2.fillPoly(img, pts =[c], color=(0, 128, 128))
+            
 
 class ColoredContourDetector:
     def __init__(self, hsv_range, min_area=None, gray_tresh=150):
@@ -322,24 +321,29 @@ def hsv_range(hcenter, hsens, smin, smax, vmin, vmax):
     
 
 class StartFinishDetector:
+    CTR_START, CTR_FINISH, CTR_NB = range(3)
     def __init__(self):
-        self.red_ccf = ColoredContourDetector(hsv_red_range(), min_area=100)
         self.green_ccf = ColoredContourDetector(hsv_green_range(), min_area=100)
+        self.red_ccf = ColoredContourDetector(hsv_red_range(), min_area=100)
+        self.ccfs = [self.green_ccf, self.red_ccf]
 
-    def sees_start(self): return self.green_ccf.has_contour()
-    def sees_finish(self): return self.red_ccf.has_contour()
+    def sees_ctr(self, ctr_idx): return self.ccfs[ctr_idx].has_contour()
+    def sees_start(self): return self.sees_ctr(self.CTR_START)
+    def sees_finish(self): return self.sees_ctr(self.CTR_FINISH)
+    def get_contour(self, ctr_idx): return self.ccfs[ctr_idx].get_contour()
         
     def process_image(self, bgr_img):
         hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
         gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-        self.red_ccf.process_hsv_image(hsv, gray)
-        self.green_ccf.process_hsv_image(hsv, gray)
+        for ccf in self.ccfs:
+            ccf.process_hsv_image(hsv, gray)
  
     def draw(self, bgr_img):
         gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
         bgr_img2 = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
-        self.red_ccf.draw(bgr_img2, color=(155, 155, 0), fill_color=(0,0,255))
-        self.green_ccf.draw(bgr_img2, color=(155, 155, 0), fill_color=(0, 255,0))
+        fill_colors = [(0, 255,0), (0,0,255)]
+        for ccf, fill_color in zip(self.ccfs, fill_colors):
+            ccf.draw(bgr_img2, color=(155, 155, 0), fill_color=fill_color)
         return bgr_img2
 
 
@@ -373,16 +377,45 @@ class BlackWhiteThresholder:
         
 class HoughLinesFinder:
     def __init__(self):
-        self.img = None
-
-    def process(self, img):
-        self.edges = cv2.Canny(img, 100, 200, apertureSize = 3)
-        minLineLength, maxLineGap = 25, 25 
-        self.lines = cv2.HoughLinesP(self.edges, rho=6, theta=np.pi/180 , threshold=30, lines=90, minLineLength=minLineLength, maxLineGap=maxLineGap)
+        self.img, self.lines, self.vlines = None, None, None
+        y0, y1, y2 = 850, 950, 1000
+        x1, x2, x3 = 110, 350, 480 
+        self.mask_be = np.array([[(0, y0), (x1, y1), (x2, y1), (x3, y0), (x3, y2), (0, y2)]])
+        self.use_mask=True
+        
+    def process(self, img, minval=100, maxval=200):
+        self.edges = cv2.Canny(img, minval, maxval, apertureSize=3)
+        if self.use_mask: cv2.fillPoly(self.edges, pts =self.mask_be, color=(0))
+        rho_acc, theta_acc = 6, np.deg2rad(1)
+        lines, threshold = 80, 30
+        minLineLength, maxLineGap = 50, 25
+        self.lines = cv2.HoughLinesP(self.edges, rho=rho_acc, theta=theta_acc , threshold=threshold,
+                                     lines=lines, minLineLength=minLineLength, maxLineGap=maxLineGap)
         print('found {} lines'.format(len(self.lines)))
+        self.vlines = []
+        dth=45.
+        for line in self.lines:
+            x1,y1,x2,y2 = line.squeeze()
+            angle = np.arctan2(y2 - y1, x2 - x1)
+            if angle < np.deg2rad(90+dth) and angle > np.deg2rad(90-dth) or\
+               angle > -np.deg2rad(90+dth) and angle < -np.deg2rad(dth-30) :
+                self.vlines.append(line)
+        self.vlines = np.array(self.vlines)
+        print('kept {} vlines'.format(len(self.vlines)))
+        #pdb.set_trace()
 
+    def has_lines(self): return self.vlines is not None and len(self.vlines) > 0
+        
+    def draw(self, img, color=(0,0,255)):
+        for line in self.lines:
+            x1,y1,x2,y2 = line.squeeze()
+            cv2.line(img,(x1,y1),(x2,y2),color,2)
+        for line in self.vlines:
+            x1,y1,x2,y2 = line.squeeze()
+            cv2.line(img,(x1,y1),(x2,y2),(255, 0, 0),2)
+        cv2.polylines(img, self.mask_be, isClosed=True, color=(0, 255, 255), thickness=2)
 
-
+            
 def get_points_on_plane(rays, plane_n, plane_d):
     return np.array([-plane_d/np.dot(ray, plane_n)*ray for ray in rays])
 
@@ -448,28 +481,5 @@ class Pipeline:
 
 
 
-
-
-
-class Foo3Pipeline(Pipeline):
-    def __init__(self, cam, be_param=BirdEyeParam()):
-        Pipeline.__init__(self)
-        self.bird_eye = BirdEyeTransformer(cam, be_param)
-        self.lane_model = trru.LaneModel()
-        self.undistorted_img = None
-        
-    def _process_image(self, img, cam):
-        self.undistorted_img = cam.undistort_img2(img)
-        self.bird_eye.process(self.undistorted_img)
-        self.edges = cv2.Canny(self.bird_eye.unwarped_img, 100, 200)
-        
-    def draw_debug(self, cam, img_cam=None):
-        if 0: img_out = img_cam
-        if 0: img_out = self.undistorted_img if self.undistorted_img is not None else np.zeros((cam.h, cam.w, 3))
-        if 0: img_out = self.bird_eye.draw_debug(cam, self.bird_eye.unwarped_img)
-        if 1: img_out = self.bird_eye.draw_debug(cam, cv2.cvtColor(self.edges, cv2.COLOR_GRAY2BGR))
-        #if self.undistorted_img is not None:
-        #    print(self.undistorted_img.dtype, self.bird_eye.unwarped_img.dtype)
-        return img_out
 
  

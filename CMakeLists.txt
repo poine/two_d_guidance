@@ -56,6 +56,7 @@ add_message_files(
   FLGuidanceStatus.msg
   TrrStartFinish.msg
   TrrTrafficLight.msg
+  TrrStateEst.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -98,6 +99,7 @@ generate_messages(
     cfg/trr_vision_start_finish.cfg
     cfg/trr_vision_traffic_light.cfg
     cfg/trr_race_manager.cfg
+    cfg/trr_world.cfg
  )
 
 ###################################

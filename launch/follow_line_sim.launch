@@ -10,6 +10,7 @@
   <arg name="start_trr_traffic_light" default="true" />
   <arg name="start_trr_guidance" default="true" />
   <arg name="start_trr_race_manager" default="true" />
+  <arg name="start_trr_world" default="true" />
   <arg name="start_viz" default="true" />
   
   <arg name="world_name" default="$(find common_simulations)/worlds/track_trr_z.world" />
@@ -42,7 +43,7 @@
       <arg name="use_gz_truth" value="$(arg filter_use_gz_truth)" /> 
     </include>
     <node name="world_to_map_publisher" pkg="tf" type="static_transform_publisher"
-          args="0 0 0  0 0 0 world map 100"/>*
+          args="0 0 0  0 0 0 world map 100"/>
   </group>
 
   <!-- ****** Fix gazebo not doing frames namespacing ***** -->
@@ -57,6 +58,7 @@
     </include>	
   </group>
   
+  <rosparam command="load" file="$(find roverboard_caroline)/config/trr_sim.yaml" />
   <!--  ****** Lane detection *****  -->
   <group if="$(arg start_trr_lane_detect)">
     <node name="trr_vision_lane_node" pkg="two_d_guidance" type="trr_vision_lane_node.py">
@@ -76,7 +78,6 @@
 
   <!--  ****** Start Finish detection *****  -->
   <group if="$(arg start_trr_start_finish)">
-    <rosparam command="load" file="$(find roverboard_caroline)/config/trr_sim.yaml" />
     <node name="trr_vision_start_finish_node" pkg="two_d_guidance" type="trr_vision_start_finish_node.py">
       <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
@@ -86,7 +87,6 @@
 
   <!--  ****** Traffic Light detection *****  -->
   <group if="$(arg start_trr_traffic_light)">
-    <rosparam command="load" file="$(find roverboard_caroline)/config/trr_sim.yaml" />
     <node name="trr_vision_traffic_light_node" pkg="two_d_guidance" type="trr_vision_traffic_light_node.py">
       <param name="cameras" value="$(arg robot_name)/camera_horiz_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
@@ -99,6 +99,8 @@
       <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
     </node>
+    <!-- for now, state estimation runs inside race_manager -->
+    <node name="trr_state_estimation_display_node" pkg="two_d_guidance" type="trr_state_estimator_display_node.py"/>
   </group>
   
   <!--  ****** Lane guidance *****  -->
@@ -110,6 +112,11 @@
     <node name="trr_guidance_display" pkg="two_d_guidance" type="trr_guidance_display_node.py" >
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
     </node>
+  </group>
+
+  <!--  ****** Lane guidance *****  -->
+  <group if="$(arg start_trr_world)">
+    <node name="trr_world_node" pkg="two_d_guidance" type="trr_world_node.py" />
   </group>
   
   <!--  ****** Viz *****  -->
