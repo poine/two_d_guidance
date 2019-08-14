@@ -6,6 +6,10 @@ import rospy, rospkg
 
 import two_d_guidance as tdg
 
+
+#
+# This is a specialized version of a path including start and finish landmarks
+#
 class StateEstPath(tdg.path.Path):
     def __init__(self, path_filename):
         tdg.path.Path.__init__(self, load=path_filename)
@@ -24,9 +28,12 @@ class StateEstPath(tdg.path.Path):
         rospy.loginfo('  lm_start idx {} pos {} dist {}'.format(self.lm_start_idx, self.lm_start_point, self.lm_start_s))
         rospy.loginfo('  lm_finish idx {} pos {} dist {}'.format(self.lm_finish_idx, self.lm_finish_point, self.lm_finish_s))
 
-
+#
+# Landmark crossing with hysteresis
+#
 class TrackMark:
     def __init__(self, s, name, hist=5):
+        ''' landmark's abscice, name, and  '''
         self.s, self.name = s, name
         self.crossed = False
         self.cnt, self.hist = 0, hist
@@ -44,9 +51,12 @@ class TrackMark:
                 self.crossed = False 
         
         return False
-            
         
-
+#
+# Naive State estimation:
+#    - integrate linear vel to predict abscice on path
+#    - use landmarks (start and finish lines for now) as measurements
+#
 class StateEstimator:
     LM_START, LM_FINISH, LM_NB = range(3)
     lm_names = ['start', 'finish']

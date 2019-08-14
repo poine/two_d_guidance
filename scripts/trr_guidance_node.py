@@ -72,6 +72,7 @@ class Guidance:
 
 class Publisher:
     def __init__(self, topic='trr_guidance/status', cmd_topic='trr_guidance/cmd'):
+        self.sta_pub = trr_rpu.SimplePublisher(two_d_guidance.msg.FLGuidanceStatus, topic)
         self.pub = rospy.Publisher(topic, two_d_guidance.msg.FLGuidanceStatus, queue_size=1)
         self.pub_cmd = rospy.Publisher(cmd_topic, geometry_msgs.msg.Twist, queue_size=1)
 
@@ -96,15 +97,14 @@ class Node:
 
     def __init__(self):
         rospy.loginfo("fl_guidance_node Starting")
-        ref_frame = rospy.get_param('~ref_frame', 'nono_0/base_link_footprint')
+        ref_frame = rospy.get_param('~ref_frame', 'caroline/base_link_footprint')
         rospy.loginfo(' using ref_frame: {}'.format(ref_frame))
         self.high_freq = 30
-        self.hf_loop_idx = 0
-        self.low_freq_div = 6
-        self.lin_sp, self.ang_sp = 0,0
+        self.hf_loop_idx, self.low_freq_div = 0, 6
+        self.lin_sp, self.ang_sp = 0.,0.
         self.lane_model = trr_u.LaneModel()
         self.guidance = Guidance(lookahead=0.6)
-        cmd_topic = rospy.get_param('~cmd_topic', '/nono_0/diff_drive_controller/cmd_vel')
+        cmd_topic = rospy.get_param('~cmd_topic', '/caroline/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
@@ -136,15 +136,8 @@ class Node:
         #self.low_freq()
         
     # def low_freq(self):
-    #     i = self.hf_loop_idx%self.low_freq_div
-    #     steps = [ lambda : self.publisher.publish_arc(self.guidance.R, self.guidance.carrot),
-    #               lambda : self.publisher.publish_carrot(self.guidance.carrot),
-    #               lambda : None,
-    #               lambda : self.publisher.publish_lane(self.lane_model),
-    #               lambda : None,
-    #               lambda : None ]
-    #     steps[i]()
-        
+    #     pass
+    
     def run(self):
         rate = rospy.Rate(self.high_freq)
         try:
