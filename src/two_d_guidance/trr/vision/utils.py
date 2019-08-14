@@ -212,10 +212,11 @@ class ContourFinder:
             if self.min_area is not None and self.cnt_max_area < self.min_area:
                self.cnt_max, self.cnt_max_area = None, 0
 
-            self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
-            self.cnt_areas_order = np.argsort(self.cnt_areas)
-            self.valid_cnts_idx = self.cnt_areas > self.min_area
-            self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
+            if 0:
+                self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
+                self.cnt_areas_order = np.argsort(self.cnt_areas)
+                self.valid_cnts_idx = self.cnt_areas > self.min_area
+                self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
                
                
     def draw(self, img, color=(255,0,0), thickness=3, fill=True, fill_color=(255,0,0), draw_all=False):

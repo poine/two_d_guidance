@@ -5,7 +5,7 @@ import roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg#, visualization_msgs.msg, sensor_msgs.msg
 
 import two_d_guidance.trr.utils as trr_u
-import two_d_guidance.trr.rospy_utils as trr_ru
+import two_d_guidance.trr.rospy_utils as trr_rpu
 
 import two_d_guidance.cfg.trr_guidanceConfig  # dynamic reconfigure
 
@@ -55,8 +55,10 @@ class Guidance:
         self.vel_ctl = VelCtl()
         self.vel_sp = vel_sp
     
-    def compute(self, lane_model, expl_noise=0.025, dy=0.1):
+    def compute(self, lane_model, s=float('inf'), expl_noise=0.025, dy=0.):
         lin = self.vel_ctl.get(lane_model)
+        if s > 14.5: dy += 0.2
+        elif s < 1.5: dy -= 0.2
         self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
         self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
         self.carrot = [self.lookahead_dist, lane_model.get_y(self.lookahead_dist)+dy]
@@ -109,7 +111,9 @@ class Node:
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
         self.lane_model_sub = trr_u.LaneModelSubscriber('/trr_vision/lane/detected_model')
-        self.odom_sub = trr_ru.OdomListener()
+        self.odom_sub = trr_rpu.OdomListener()
+        self.ss_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
+        
 
     def cfg_callback(self, config, level):
         rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead_dist}/{lookahead_time}, vel_setpoint: {vel_sp}".format(**config))
@@ -125,9 +129,10 @@ class Node:
 
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
+        s = self.ss_sub.get()
         if self.guidance.mode != Guidance.mode_idle:
             if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
-                self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, expl_noise=0.)
+                self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, s, expl_noise=0.)
             else:
                 self.lin_sp, self.ang_sp = 0, 0
             self.publisher.publish_cmd(self.lin_sp, self.ang_sp)

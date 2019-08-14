@@ -11,14 +11,14 @@ import two_d_guidance as tdg
 # This is a specialized version of a path including start and finish landmarks
 #
 class StateEstPath(tdg.path.Path):
-    def __init__(self, path_filename):
+    def __init__(self, path_filename, xstart=1.21, xfinish=0.86):
         tdg.path.Path.__init__(self, load=path_filename)
         self.len = self.dists[-1] - self.dists[0]
         # start is 1.25m before center of straight line
-        self.lm_start_idx, self.lm_start_point = self.find_point_at_dist_from_idx(0, _d=self.len-1.25)
+        self.lm_start_idx, self.lm_start_point = self.find_point_at_dist_from_idx(0, _d=self.len-xstart)
         self.lm_start_s = self.dists[self.lm_start_idx]
         # finish is 1.25m after center of straight line
-        self.lm_finish_idx, self.lm_finish_point = self.find_point_at_dist_from_idx(0, _d=1.25)
+        self.lm_finish_idx, self.lm_finish_point = self.find_point_at_dist_from_idx(0, _d=xfinish)
         self.lm_finish_s = self.dists[self.lm_finish_idx]
 
     def report(self):
@@ -90,14 +90,14 @@ class StateEstimator:
         if self.finish_track.update(self.sn) and self.lm_passed_cbk is not None: self.lm_passed_cbk(StateEstimator.LM_FINISH)
             
         
-    def update_odom(self, seq, stamp, vx, vy):
+    def update_odom(self, seq, stamp, vx, vy, k=1.05):
         if self.last_stamp is not None:
             dt = (stamp - self.last_stamp).to_sec()
             #print('odom dt {} vx {:.4f} vy {:.4f}'.format(dt, vx, vy))
             if dt < 0.01 or dt > 0.1:
                 print('state est: out of range dt')
             else:
-                ds = 0.85*vx*dt
+                ds = k*vx*dt
                 #print('update: {}'.format(ds))
                 self._update_s(ds)
         self.last_stamp = stamp
