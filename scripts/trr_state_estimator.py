@@ -36,7 +36,7 @@ class Node:
         seq, stamp, vx, vy = msg.header.seq, msg.header.stamp, msg.twist.twist.linear.x, msg.twist.twist.linear.y
         self.estimator.update_odom(seq, stamp, vx, vy)
 
-    def on_start_finish(self):
+    def on_start_finish(self, msg):
         start_points, finish_points, dist_to_start, dist_to_finish = self.start_finish_sub.get()
         self.estimator.update_landmark(dist_to_start, dist_to_finish)
 

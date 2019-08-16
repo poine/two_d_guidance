@@ -38,7 +38,7 @@ class SimpleSubscriber:
 #
 # StartFinish
 #
-class TrrStartFinishPublisherr(SimplePublisher):
+class TrrStartFinishPublisher(SimplePublisher):
     def __init__(self, topic='trr_vision/start_finish/status'):
         SimplePublisher.__init__(self, topic, two_d_guidance.msg.TrrStartFinish, 'start finish')
         #rospy.loginfo(' publishing start finish status on ({})'.format(topic))
