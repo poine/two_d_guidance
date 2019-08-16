@@ -16,7 +16,7 @@ class Node:
     def __init__(self, autostart=False, low_freq=20.):
         self.low_freq = low_freq
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='race_manager')
-        self.crossed_finish = False
+        #self.crossed_finish = False
 
         self.cur_lap, self.nb_lap = 0, 1
         
@@ -68,11 +68,11 @@ class Node:
     def periodic(self):
         cbks = [self.periodic_staging, self.periodic_ready, self.periodic_racing, self.periodic_finished, self.periodic_join_start]
         try:
-            s_est, v_est, self.start_crossed, self.finish_crossed, dist_to_start, dist_to_finish = self.state_est_sub.get()
-            if self.start_crossed:
-                rospy.loginfo('race manager periodic: start crossed')
-            if self.finish_crossed:
-                rospy.loginfo('race manager periodic: finish crossed')
+            s_est, v_est, self.cur_lap, dist_to_start, dist_to_finish = self.state_est_sub.get()
+            # if self.start_crossed:
+            #     rospy.loginfo('race manager periodic: start crossed')
+            # if self.finish_crossed:
+            #     rospy.loginfo('race manager periodic: finish crossed')
             cbks[self.mode]()
         except trr_rpu.NoRXMsgException:
             rospy.loginfo_throttle(1., 'NoRXMsgException')
@@ -112,22 +112,22 @@ class Node:
         rospy.loginfo('    entering racing: lap ({}/{})'.format(self.cur_lap, self.nb_lap))
         #self.dyn_cfg_update_cur_lap(0)
         self.cur_lap = 0
-        self.start_crossed, self.finish_crossed = False, False
+        #self.start_crossed, self.finish_crossed = False, False
         self.set_guidance_mode(2) # guidance is driving when racing
 
     def periodic_racing(self):
-        s_est, v_est, start_crossed, self.finish_crossed, dist_to_start, dist_to_finish = self.state_est_sub.get()
+        s_est, v_est, cur_lap, dist_to_start, dist_to_finish = self.state_est_sub.get()
         #rospy.loginfo('racing_periodic: finish crossed {}'.format(self.finish_crossed))
-        if self.finish_crossed:
+        #if self.finish_crossed:
             #rospy.loginfo('racing_periodic: finish crossed {}/{}'.format(self.cur_lap, self.nb_lap))
-            if self.cur_lap >= self.nb_lap: # we brake
-                rospy.loginfo('final lap ({}/{}): braking'.format(self.cur_lap, self.nb_lap))
-                self.dyn_cfg_update_race_mode(Node.mode_finished)
-            else:
+        if self.cur_lap >= self.nb_lap: # we brake
+            rospy.loginfo('final lap ({}/{}): braking'.format(self.cur_lap, self.nb_lap))
+            self.dyn_cfg_update_race_mode(Node.mode_finished)
+            #else:
                 #self.dyn_cfg_update_cur_lap(self.cur_lap+1) # or we pass to next lap
-                self.cur_lap += 1
-                rospy.loginfo('starting lap {}'.format(self.cur_lap))
-            self.finish_crossed = False
+            #    self.cur_lap += 1
+            #    rospy.loginfo('starting lap {}'.format(self.cur_lap))
+            #self.finish_crossed = False
 
     # -Finished: we do nothing
     #
@@ -142,7 +142,7 @@ class Node:
         self.set_guidance_mode(2) # driving when going to start
 
     def periodic_join_start(self, dist_to_stop_at=0.15):
-        s_est, v_est, start_crossed, finish_crossed, dist_to_start, dist_to_finish = self.state_est_sub.get()
+        s_est, v_est, cur_lap, dist_to_start, dist_to_finish = self.state_est_sub.get()
         #dist_to_start = self.state_estimator.dist_to_start()
         if dist_to_start < dist_to_stop_at:
             rospy.loginfo('start joined, going to ready')

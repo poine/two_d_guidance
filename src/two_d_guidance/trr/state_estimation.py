@@ -69,17 +69,15 @@ class TrackMark:
 #    - use landmarks (start and finish lines for now) as measurements
 #
 class StateEstimator:
-    LM_START, LM_FINISH, LM_NB = range(3)
-    lm_names = ['start', 'finish']
     
     def __init__(self, lm_passed_cbk=None):
         self.lm_passed_cbk = lm_passed_cbk
         self.load_path()
-        self.s, self.sn, self.v = 0., 0., 0. # abscice, normalized abscice, velocity
+        self.s, self.sn, self.v, self.cur_lap = 0., 0., 0., 0 # abscice, normalized abscice, velocity, current lap
         self.k_odom = 1.
-        self.lm_pred = np.full(self.LM_NB, float('inf'), dtype=np.float32)
-        self.lm_meas = np.full(self.LM_NB, float('inf'), dtype=np.float32)
-        self.lm_res  = np.full(self.LM_NB, float('inf'), dtype=np.float32)
+        self.lm_pred = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
+        self.lm_meas = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
+        self.lm_res  = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
         self.meas_dist_to_start, self.meas_dist_to_finish = float('inf'), float('inf')
         self.predicted_dist_to_start, self.predicted_dist_to_finish = float('inf'), float('inf')
         self.start_residual, self.finish_residual = float('inf'), float('inf')
@@ -100,11 +98,13 @@ class StateEstimator:
     def _update_s(self, ds):
         self.s += ds
         self.prev_sn = self.sn
-        self._norm_s()
+        self.sn = self._norm_s(self.s)
         
-        if self.start_track.update(self.sn) and self.lm_passed_cbk is not None: self.lm_passed_cbk(StateEstimator.LM_START)
+        if self.start_track.update(self.sn) and self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_START)
 
-        if self.finish_track.update(self.sn) and self.lm_passed_cbk is not None: self.lm_passed_cbk(StateEstimator.LM_FINISH)
+        if self.finish_track.update(self.sn):
+            self.cur_lap += 1
+            if self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_FINISH)
             
         
     def update_odom(self, seq, stamp, vx, vy):
@@ -120,10 +120,10 @@ class StateEstimator:
                 self._update_s(ds)
         self.last_stamp = stamp
 
-    def _norm_s(self):
-        self.sn = self.s
-        while self.sn > self.path.len: self.sn -= self.path.len
-        while self.sn < 0: self.sn += self.path.len
+    def _norm_s(self, s):
+        while s > self.path.len: s -= self.path.len
+        while s < 0: s += self.path.len
+        return s
 
     def _norm_s_err(self, s_err):
         while s_err > self.path.len/2: s_err -= self.path.len
@@ -132,38 +132,40 @@ class StateEstimator:
 
     def update_landmark1(self, lm_id, m, clip_res=1., gain=0.075):
         self.lm_meas[lm_id] = m
-        self.lm_pred[lm_id] = self.path.lm_s[lm_id]-self.sn
+        self.lm_pred[lm_id] = self._norm_s(self.path.lm_s[lm_id]-self.sn)
         if not math.isinf(self.lm_meas[lm_id]):
             self.lm_res[lm_id] = self._norm_s_err(self.lm_meas[lm_id] - self.lm_pred[lm_id])
-            self.lm_res[lm_id] = np.clip(self.lm_res[lm_id], -clip_res, clip_res)
-            self._update_s(-gain*elf.lm_res[lm_id])
+            self._update_s(-gain*np.clip(self.lm_res[lm_id], -clip_res, clip_res))
         else:
             self.lm_res[lm_id] = float('inf')
             
     def update_landmark(self, meas_dist_to_start, meas_dist_to_finish, gain=0.075, disable_correction=False):
         #print('meas start {} meas finish {}'.format(meas_dist_to_start, meas_dist_to_finish))
         self.meas_dist_to_start, self.meas_dist_to_finish = meas_dist_to_start, meas_dist_to_finish
-        if not math.isinf(meas_dist_to_finish) or disable_correction:
-            self.predicted_dist_to_finish = self.path.lm_finish_s-self.sn
-            self.finish_residual = self._norm_s_err(meas_dist_to_finish - self.predicted_dist_to_finish)
-            self.finish_residual = np.clip(self.finish_residual, -0.5, 0.5)
-            ds = -gain*self.finish_residual
-            self._update_s(ds)
-        else:
-            self.predicted_dist_to_finish = float('inf')
-            self.finish_residual = float('inf')
-            
-        if not math.isinf(meas_dist_to_start) or disable_correction:
-            self.predicted_dist_to_start = self.path.lm_start_s-self.sn
-            self.start_residual = self._norm_s_err(meas_dist_to_start - self.predicted_dist_to_start)
-            self.start_residual = np.clip(self.start_residual, -0.5, 0.5)
-            ds = -gain*self.start_residual
-            self._update_s(ds)
-        else:
-            self.predicted_dist_to_start = float('inf')
-            self.start_residual = float('inf')
+        # if not math.isinf(meas_dist_to_finish) or disable_correction:
+        #     self.predicted_dist_to_finish = self.path.lm_finish_s-self.sn
+        #     self.finish_residual = self._norm_s_err(meas_dist_to_finish - self.predicted_dist_to_finish)
+        #     self.finish_residual = np.clip(self.finish_residual, -0.5, 0.5)
+        #     ds = -gain*self.finish_residual
+        #     self._update_s(ds)
+        # else:
+        #     self.predicted_dist_to_finish = float('inf')
+        #     self.finish_residual = float('inf')
+        self.update_landmark1(self.path.LM_FINISH, meas_dist_to_finish)
+        self.predicted_dist_to_finish = self.lm_pred[self.path.LM_FINISH]
+        
+        # if not math.isinf(meas_dist_to_start) or disable_correction:
+        #     self.predicted_dist_to_start = self.path.lm_start_s-self.sn
+        #     self.start_residual = self._norm_s_err(meas_dist_to_start - self.predicted_dist_to_start)
+        #     self.start_residual = np.clip(self.start_residual, -0.5, 0.5)
+        #     ds = -gain*self.start_residual
+        #     self._update_s(ds)
+        # else:
+        #     self.predicted_dist_to_start = float('inf')
+        #     self.start_residual = float('inf')
 
-        #self.update_landmark1(self.path.LM_START, meas_dist_to_start)
+        self.update_landmark1(self.path.LM_START, meas_dist_to_start)
+        self.predicted_dist_to_start = self.lm_pred[self.path.LM_START]
 
             
         

@@ -41,9 +41,9 @@ class Node:
         self.estimator.update_landmark(dist_to_start, dist_to_finish)
 
     def on_lm_passed(self, lm_id):
-        rospy.loginfo('### on_lm_passed: passed {}'.format(self.estimator.lm_names[lm_id]))
-        if   lm_id == self.estimator.LM_START:  self.start_crossed  = True
-        elif lm_id == self.estimator.LM_FINISH: self.finish_crossed = True
+        rospy.loginfo('### on_lm_passed: passed {}'.format(self.estimator.path.lm_names[lm_id]))
+        if   lm_id == self.estimator.path.LM_START:  self.start_crossed  = True
+        elif lm_id == self.estimator.path.LM_FINISH: self.finish_crossed = True
         
     def periodic(self):
         self.state_est_pub.publish(self.estimator, self.start_crossed, self.finish_crossed)

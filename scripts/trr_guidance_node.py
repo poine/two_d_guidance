@@ -57,8 +57,8 @@ class Guidance:
     
     def compute(self, lane_model, s=float('inf'), expl_noise=0.025, dy=0.):
         lin = self.vel_ctl.get(lane_model)
-        if s > 14.5: dy += 0.2
-        elif s < 1.5: dy -= 0.2
+        if s > 15.5 and s < 16.: dy += 0.25
+        elif s > 0.5 and s < 1.: dy -= 0.25
         self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
         self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
         self.carrot = [self.lookahead_dist, lane_model.get_y(self.lookahead_dist)+dy]
@@ -110,7 +110,7 @@ class Node:
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
         self.lane_model_sub = trr_u.LaneModelSubscriber('/trr_vision/lane/detected_model')
-        self.odom_sub = trr_rpu.OdomListener()
+        self.odom_sub = trr_rpu.OdomListener(what='guidance')
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
         
 
@@ -129,18 +129,18 @@ class Node:
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
         try:
-            s = self.state_est_sub.get()
+            _s, _v, _l, _ds, _df = self.state_est_sub.get()
             if self.guidance.mode != Guidance.mode_idle:
                 if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
-                    self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, s, expl_noise=0.)
+                    self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, _s, expl_noise=0.)
                 else:
                     self.lin_sp, self.ang_sp = 0, 0
                 self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
             self.publisher.publish_status(self.guidance, self.lane_model, self.lin_sp, self.ang_sp)
         except trr_rpu.NoRXMsgException:
-            print('NoRXMsgException')
+            rospy.loginfo_throttle(1., 'guidance: NoRXMsgException')
         except trr_rpu.RXMsgTimeoutException:
-            print('RXMsgTimeoutException')
+            rospy.loginfo_throttle(1., 'guidance: RXMsgTimeoutException')
         self.hf_loop_idx += 1
 
         #self.low_freq()
