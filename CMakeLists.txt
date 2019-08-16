@@ -95,6 +95,7 @@ generate_messages(
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
  generate_dynamic_reconfigure_options(
     cfg/trr_guidance.cfg
+    cfg/trr_state_estimator.cfg
     cfg/trr_vision_lane.cfg
     cfg/trr_vision_start_finish.cfg
     cfg/trr_vision_traffic_light.cfg

@@ -37,7 +37,7 @@ class ROSMap:
             self.free_thresh = _yaml['free_thresh']
 
     def save(self, map_dir, map_name):
-        LOG.info(' saving map to {} {}'.format(map_dir, map_name))
+        LOG.info(' saving map to {}/{}.[yaml/png]'.format(map_dir, map_name))
         self.img_name = '{}.png'.format(map_name)
         img_filename = os.path.join(map_dir, self.img_name)
         self.img.save(img_filename)

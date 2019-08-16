@@ -7,16 +7,120 @@ import smocap # for cameras
 import smocap.rospy_utils
 import two_d_guidance.msg
 
-class OdomListener:
-    def __init__(self, odom_topic = '/caroline/diff_drive_controller/odom', callback=None):
-        self.odom_sub = rospy.Subscriber(odom_topic, nav_msgs.msg.Odometry, self.callback if callback is None else callback)
+class NoRXMsgException(Exception): pass
+class RXMsgTimeoutException(Exception): pass
+
+class SimplePublisher(rospy.Publisher):
+    def __init__(self, topic, msg_class, what, qs=1):
+        rospy.loginfo(' {} publishing on {}'.format(what, topic))
+        rospy.Publisher.__init__(self, topic, msg_class, queue_size=qs)
+        self.msg_class = msg_class
+        
+class SimpleSubscriber:
+    def __init__(self, topic, msg_class, what, timeout=0.5, user_cbk=None):
+        self.sub = rospy.Subscriber(topic, msg_class, self.msg_callback, queue_size=1)
+        rospy.loginfo(' {} subscribed to {}'.format(what, topic))
+        self.timeout, self.user_cbk = timeout, user_cbk
+        self.msg = None
+        
+    def msg_callback(self, msg):
+        self.msg = msg
+        self.last_msg_time = rospy.get_rostime()
+        if self.user_cbk is not None: self.user_cbk(msg)
+
+    def get(self):
+        if self.msg is None:
+            raise NoRXMsgException
+        if (rospy.get_rostime()-self.last_msg_time).to_sec() > self.timeout:
+            raise RXMsgTimeoutException
+        return self.msg
+
+#
+# StartFinish
+#
+class TrrStartFinishPublisherr(SimplePublisher):
+    def __init__(self, topic='trr_vision/start_finish/status'):
+        SimplePublisher.__init__(self, topic, two_d_guidance.msg.TrrStartFinish, 'start finish')
+        #rospy.loginfo(' publishing start finish status on ({})'.format(topic))
+        #self.pub = rospy.Publisher(topic, two_d_guidance.msg.TrrStartFinish, queue_size=1)
+
+    def publish(self, pl):
+        msg = two_d_guidance.msg.TrrStartFinish()
+        if pl.ss_dtc.sees_start():
+            for (x, y, z) in pl.start_ctr_lfp:
+               msg.start_points.append(msgPoint(x, y, z))
+        if pl.ss_dtc.sees_finish():
+            for (x, y, z) in pl.finish_ctr_lfp:
+               msg.finish_points.append(msgPoint(x, y, z))
+        msg.dist_to_finish = pl.dist_to_finish
+        msg.dist_to_start = pl.dist_to_start
+        SimplePublisher.publish(self, msg)
+
+        
+class TrrStartFinishSubscriber(SimpleSubscriber):
+    def __init__(self, topic='trr_vision/start_finish/status', what='N/A', timeout=0.1, user_callback=None):
+        SimpleSubscriber.__init__(self, topic, two_d_guidance.msg.TrrStartFinish, what, timeout, user_callback)
+
+    def get(self):
+        msg = SimpleSubscriber.get(self)
+        def array_of_pts(pts): return [[p.x, p.y, p.z] for p in  pts]
+        return array_of_pts(self.msg.start_points), array_of_pts(self.msg.finish_points), self.msg.dist_to_start, self.msg.dist_to_finish 
+    def viewing_finish(self):
+        try:
+            msg = SimpleSubscriber.get(self)
+        except NoRXMsgException, RXMsgTimeoutException:
+            return False
+        return self.msg.finish_points
+#
+# StateEstimation
+#               
+class TrrStateEstimationPublisher(SimplePublisher):
+    def __init__(self, topic='trr_state_est/status'):
+        SimplePublisher.__init__(self, topic, two_d_guidance.msg.TrrStateEst, 'state estimation')
+
+    def publish(self, model, start_crossed, finish_crossed):
+        msg = self.msg_class()
+        msg.s = model.sn
+        msg.v = model.v
+        msg.start_crossed  = start_crossed
+        msg.finish_crossed  = finish_crossed
+        msg.dist_to_finish = model.predicted_dist_to_finish
+        msg.dist_to_start  = model.predicted_dist_to_start
+        msg.dist_to_finish = model.predicted_dist_to_finish
+        msg.s = model.sn
+        SimplePublisher.publish(self, msg)
+
+class TrrStateEstimationSubscriber(SimpleSubscriber):
+    def __init__(self, topic='trr_state_est/status', what='unkown'):
+        SimpleSubscriber.__init__(self, topic, two_d_guidance.msg.TrrStateEst, what)
+
+    def get(self):
+        msg = SimpleSubscriber.get(self)
+        return msg.s, msg.v, msg.start_crossed, msg.finish_crossed, msg.dist_to_start, msg.dist_to_finish 
+
+    
+class OdomListener(SimpleSubscriber):
+    def __init__(self, topic='/caroline/diff_drive_controller/odom', what='N/A', timeout=0.1, user_cbk=None):
+        SimpleSubscriber.__init__(self, topic, nav_msgs.msg.Odometry, what, timeout, user_cbk)
         self.lin, self.ang = 0, 0
         
-    def callback(self, msg):
-        self.msg = msg
-        self.lin, self.ang = msg.twist.twist.linear.x, msg.twist.twist.angular.z
-        
+    def get(self):
+        msg = SimpleSubscriber.get(self)
+        return msg.twist.twist.linear.x, msg.twist.twist.angular.z
 
+    def get_vel(self):
+        msg = SimpleSubscriber.get(self)
+        return msg.twist.twist.linear.x, msg.twist.twist.angular.z
+
+    def get_pose(self):
+        msg = SimpleSubscriber.get(self)
+        return np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z])
+
+    def get_2Dpose(self):
+        msg = SimpleSubscriber.get(self)
+        return np.array([msg.pose.pose.position.x, msg.pose.pose.position.y])
+
+    
         
 class ImgPublisher:
     def __init__(self, cam, img_topic = "/trr_vision/start_finish/image_debug"):
@@ -47,7 +151,6 @@ class CompressedImgPublisher:
         
         
 def msgPoint(x, y, z): p = geometry_msgs.msg.Point(); p.x=x; p.y=y;p.z=z; return p
-
 
 class ContourPublisher:
     def __init__(self, frame_id='caroline/base_link_footprint', topic='/contour',
@@ -83,50 +186,6 @@ class ContourPublisher:
         self.pub.publish(self.msg)
         
 
-class TrrStartFinishPublisher:
-    def __init__(self, topic='trr_vision/start_finish/status'):
-        rospy.loginfo(' publishing start finish status on ({})'.format(topic))
-        self.pub = rospy.Publisher(topic, two_d_guidance.msg.TrrStartFinish, queue_size=1)
-
-    def publish(self, pl):
-        msg = two_d_guidance.msg.TrrStartFinish()
-        if pl.ss_dtc.sees_start():
-            for (x, y, z) in pl.start_ctr_lfp:
-               msg.start_points.append(msgPoint(x, y, z))
-        if pl.ss_dtc.sees_finish():
-            for (x, y, z) in pl.finish_ctr_lfp:
-               msg.finish_points.append(msgPoint(x, y, z))
-        msg.dist_to_finish = pl.dist_to_finish
-        msg.dist_to_start = pl.dist_to_start
-        self.pub.publish(msg)
-
-        
-class TrrStartFinishSubscriber:
-    def __init__(self, topic='trr_vision/start_finish/status', user_callback=None):
-        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.TrrStartFinish, self.msg_callback, queue_size=1)
-        rospy.loginfo(' subscribed to ({})'.format(topic))
-        self.user_callback = user_callback
-        self.msg = None
-        self.timeout = 0.5
-        
-    def msg_callback(self, msg):
-        self.msg = msg
-        self.last_msg_time = rospy.get_rostime()
-        if self.user_callback: self.user_callback()
-
-    def get(self):
-        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
-            #pdb.set_trace()
-            def array_of_pts(pts): return [[p.x, p.y, p.z] for p in  pts]
-            return array_of_pts(self.msg.start_points), array_of_pts(self.msg.finish_points), self.msg.dist_to_start, self.msg.dist_to_finish 
-        else:
-            return [], [], np.inf, np.inf
-
-    def viewing_finish(self):
-        return (self.msg is not None) and\
-               ((rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout) and\
-               (self.msg.finish_points)
-        
 
 class TrrTrafficLightPublisher:
     def __init__(self, topic='trr_vision/traffic_light/status'):
@@ -154,44 +213,14 @@ class TrrTrafficLightSubscriber:
         else: return False, False, False
 
 
-class SimplePublisher:
-    def __init__(self, msg_class, topic, what):
-        rospy.loginfo(' publishing {} status on {}'.format(what, topic))
-        self.pub = rospy.Publisher(topic, msg_class, queue_size=1)
-        self.msg_class = msg_class
-        
-class TrrStateEstimationPublisher(SimplePublisher):
-    def __init__(self, topic='trr_state_est/status'):
-        SimplePublisher.__init__(self, two_d_guidance.msg.TrrStateEst, topic, 'state estimation')
-
-    def publish(self, model):
-        msg = self.msg_class()
-        msg.s = model.sn
-        self.pub.publish(msg)
-
-class SimpleSubscriber:
-    def __init__(self, msg_class, topic, what, timeout=0.5):
-        self.sub = rospy.Subscriber(topic, msg_class, self.msg_callback, queue_size=1)
-        rospy.loginfo(' subscribed {} to ({})'.format(what, topic))
-        self.timeout = timeout
-        self.msg = None
-        
-    def msg_callback(self, msg):
-        self.msg = msg
-        self.last_msg_time = rospy.get_rostime()
-
 
         
-class TrrStateEstimationSubscriber(SimpleSubscriber):
-    def __init__(self, topic='trr_state_est/status', what='unkown'):
-        SimpleSubscriber.__init__(self, two_d_guidance.msg.TrrStateEst, topic, what)
-
-    def get(self):
-        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
-            return self.msg.s
-        else: return float('inf')
-
+           
         
+
+
+
+
 class TrrSimpleVisionPipeNode:
     def __init__(self, pipeline_class, pipe_cbk=None, low_freq=10):
         self.low_freq = low_freq

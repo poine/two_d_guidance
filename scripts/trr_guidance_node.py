@@ -74,7 +74,7 @@ class Guidance:
 
 class Publisher:
     def __init__(self, topic='trr_guidance/status', cmd_topic='trr_guidance/cmd'):
-        self.sta_pub = trr_rpu.SimplePublisher(two_d_guidance.msg.FLGuidanceStatus, topic)
+        self.sta_pub = trr_rpu.SimplePublisher(topic, two_d_guidance.msg.FLGuidanceStatus, "controller commands")
         self.pub = rospy.Publisher(topic, two_d_guidance.msg.FLGuidanceStatus, queue_size=1)
         self.pub_cmd = rospy.Publisher(cmd_topic, geometry_msgs.msg.Twist, queue_size=1)
 
@@ -101,7 +101,6 @@ class Node:
         rospy.loginfo("fl_guidance_node Starting")
         ref_frame = rospy.get_param('~ref_frame', 'caroline/base_link_footprint')
         rospy.loginfo(' using ref_frame: {}'.format(ref_frame))
-        self.high_freq = 30
         self.hf_loop_idx, self.low_freq_div = 0, 6
         self.lin_sp, self.ang_sp = 0.,0.
         self.lane_model = trr_u.LaneModel()
@@ -112,7 +111,7 @@ class Node:
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
         self.lane_model_sub = trr_u.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.odom_sub = trr_rpu.OdomListener()
-        self.ss_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
+        self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
         
 
     def cfg_callback(self, config, level):
@@ -129,22 +128,28 @@ class Node:
 
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
-        s = self.ss_sub.get()
-        if self.guidance.mode != Guidance.mode_idle:
-            if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
-                self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, s, expl_noise=0.)
-            else:
-                self.lin_sp, self.ang_sp = 0, 0
-            self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
+        try:
+            s = self.state_est_sub.get()
+            if self.guidance.mode != Guidance.mode_idle:
+                if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
+                    self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, s, expl_noise=0.)
+                else:
+                    self.lin_sp, self.ang_sp = 0, 0
+                self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
+            self.publisher.publish_status(self.guidance, self.lane_model, self.lin_sp, self.ang_sp)
+        except trr_rpu.NoRXMsgException:
+            print('NoRXMsgException')
+        except trr_rpu.RXMsgTimeoutException:
+            print('RXMsgTimeoutException')
         self.hf_loop_idx += 1
-        self.publisher.publish_status(self.guidance, self.lane_model, self.lin_sp, self.ang_sp)
+
         #self.low_freq()
         
     # def low_freq(self):
     #     pass
     
-    def run(self):
-        rate = rospy.Rate(self.high_freq)
+    def run(self, high_freq=30):
+        rate = rospy.Rate(high_freq)
         try:
             while not rospy.is_shutdown():
                 self.periodic()
