@@ -6,6 +6,7 @@ import nav_msgs.msg , geometry_msgs.msg, visualization_msgs.msg, sensor_msgs.msg
 
 import two_d_guidance.msg
 import two_d_guidance.trr.utils as trr_u
+import two_d_guidance.trr.rospy_utils as trr_rpu
 
 import smocap.rospy_utils, cv2
 
@@ -25,7 +26,7 @@ class MarkerPublisher:
         self.arc_msg = nav_msgs.msg.Path()
         self.arc_msg.header.frame_id = ref_frame
 
-        self.pub_lane = trr_u.LaneModelMarkerPublisher(ref_frame=ref_frame, topic='trr_guidance/detected_lane_model_guidance', color=(1, 1, 0, 0))
+        self.pub_lane = trr_rpu.LaneModelMarkerPublisher(ref_frame=ref_frame, topic='trr_guidance/detected_lane_model_guidance', color=(1, 1, 0, 0))
         
         #self.img_pub = ImgPublisher()
         

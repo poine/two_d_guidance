@@ -108,6 +108,7 @@
   <group if="$(arg start_trr_state_estimation)">
     <node name="trr_state_estimator_node" pkg="two_d_guidance" type="trr_state_estimator.py">
       <remap from="/odom" to="/$(arg robot_name)/diff_drive_controller/odom"/>
+      <param name="k_odom" value="1."/>
     </node>
     <node name="trr_state_estimator_display_node" pkg="two_d_guidance" type="trr_state_estimator_display_node.py">
       <param name="camera" value="$(arg robot_name)/camera_horiz_front"/>

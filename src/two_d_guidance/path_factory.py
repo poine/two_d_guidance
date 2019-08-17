@@ -190,10 +190,18 @@ def draw_path(fig, ax, p):
     lc.set_linewidth(2)
     line = ax.add_collection(lc)
     fig.colorbar(line, ax=ax)
+    dx, dy = 0.1, 0.1
+    ax.set_xlim(p.points[:,0].min()-dx, p.points[:,0].max()+dx)
+    ax.set_ylim(p.points[:,1].min()-dy, p.points[:,1].max()+dy)
+    ax.set_aspect('equal'); plt.title('2D: vertex indicices along path')
 
-    ax.set_xlim(p.points[:,0].min(), p.points[:,0].max())
-    ax.set_ylim(p.points[:,1].min(), p.points[:,1].max())
-    ax.set_aspect('equal'); plt.title('2D')
+def draw_path_curvature(fig, ax, path):
+    plt.title('curvatures')
+    plt.plot(path.curvatures)
+
+def draw_path_vel(fig, ax, path):
+    plt.title('vel')
+    plt.plot(path.vels)
     
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

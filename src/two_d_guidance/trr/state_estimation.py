@@ -68,6 +68,9 @@ class TrackMark:
 #    - integrate linear vel to predict abscice on path
 #    - use landmarks (start and finish lines for now) as measurements
 #
+
+#TODO INITIALIZATION
+
 class StateEstimator:
     
     def __init__(self, lm_passed_cbk=None):
@@ -130,7 +133,7 @@ class StateEstimator:
         while s_err < -self.path.len/2: s_err += self.path.len
         return s_err
 
-    def update_landmark1(self, lm_id, m, clip_res=1., gain=0.075):
+    def update_landmark(self, lm_id, m, clip_res=1., gain=0.075):
         self.lm_meas[lm_id] = m
         self.lm_pred[lm_id] = self._norm_s(self.path.lm_s[lm_id]-self.sn)
         if not math.isinf(self.lm_meas[lm_id]):
@@ -139,7 +142,7 @@ class StateEstimator:
         else:
             self.lm_res[lm_id] = float('inf')
             
-    def update_landmark(self, meas_dist_to_start, meas_dist_to_finish, gain=0.075, disable_correction=False):
+    def update_landmarks(self, meas_dist_to_start, meas_dist_to_finish, gain=0.075, disable_correction=False):
         #print('meas start {} meas finish {}'.format(meas_dist_to_start, meas_dist_to_finish))
         self.meas_dist_to_start, self.meas_dist_to_finish = meas_dist_to_start, meas_dist_to_finish
         # if not math.isinf(meas_dist_to_finish) or disable_correction:
@@ -151,8 +154,9 @@ class StateEstimator:
         # else:
         #     self.predicted_dist_to_finish = float('inf')
         #     self.finish_residual = float('inf')
-        self.update_landmark1(self.path.LM_FINISH, meas_dist_to_finish)
+        self.update_landmark(self.path.LM_FINISH, meas_dist_to_finish)
         self.predicted_dist_to_finish = self.lm_pred[self.path.LM_FINISH]
+        if self.lm_res[self.path.LM_FINISH] == float('inf'): self.predicted_dist_to_finish = float('inf')
         
         # if not math.isinf(meas_dist_to_start) or disable_correction:
         #     self.predicted_dist_to_start = self.path.lm_start_s-self.sn
@@ -164,9 +168,9 @@ class StateEstimator:
         #     self.predicted_dist_to_start = float('inf')
         #     self.start_residual = float('inf')
 
-        self.update_landmark1(self.path.LM_START, meas_dist_to_start)
+        self.update_landmark(self.path.LM_START, meas_dist_to_start)
         self.predicted_dist_to_start = self.lm_pred[self.path.LM_START]
-
+        if self.lm_res[self.path.LM_START] == float('inf'): self.predicted_dist_to_start = float('inf')
             
         
     def _status(self):

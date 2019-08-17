@@ -5,9 +5,11 @@ import dynamic_reconfigure.client,  dynamic_reconfigure.server
 #from geometry_msgs.msg import PolygonStamped, Point32
 import pdb
 
+import two_d_guidance.trr.utils as trr_u
 import two_d_guidance.trr.rospy_utils as trr_rpu
 import two_d_guidance.trr.state_estimation as trr_se
 import two_d_guidance.cfg.trr_race_managerConfig
+import two_d_guidance.srv
 
 # TODO: add traffic light display
 
@@ -15,11 +17,11 @@ class Node:
     mode_staging, mode_ready, mode_racing, mode_finished, mode_join_start = range(5)
     def __init__(self, autostart=False, low_freq=20.):
         self.low_freq = low_freq
-        self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='race_manager')
-        #self.crossed_finish = False
-
         self.cur_lap, self.nb_lap = 0, 1
-        
+        # we publish our status
+        self.status_pub = trr_rpu.RaceManagerStatusPublisher()
+        # we expose a service to be informed when landmarks are passed
+        self.lm_service = rospy.Service('LandmarkPassed', two_d_guidance.srv.LandmarkPassed, self.on_landmark_passed)
         self.guidance_cfg_client, self.race_manager_cfg_srv = None, None 
         # we manipulate parameters exposed by the guidance node
         guidance_client_name = "trr_guidance_node"
@@ -29,8 +31,17 @@ class Node:
         self.race_manager_cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_race_managerConfig, self.race_manager_cfg_callback)
         self.dyn_cfg_update_race_mode(Node.mode_racing if autostart else Node.mode_staging)
 
+        self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='race_manager')
         self.traffic_light_sub = trr_rpu.TrrTrafficLightSubscriber()
 
+
+    def on_landmark_passed(self, req):
+        print req.id
+        if req.id == 1: # FIXME....
+            self.cur_lap += 1
+            print 'cur_lap'.format(self.cur_lap)
+        return two_d_guidance.srv.LandmarkPassedResponse(0)
+        
     def dyn_cfg_update_race_mode(self, mode): self.race_manager_cfg_srv.update_configuration({'mode': mode})
 
     def dyn_cfg_update_cur_lap(self, _v):
@@ -68,7 +79,7 @@ class Node:
     def periodic(self):
         cbks = [self.periodic_staging, self.periodic_ready, self.periodic_racing, self.periodic_finished, self.periodic_join_start]
         try:
-            s_est, v_est, self.cur_lap, dist_to_start, dist_to_finish = self.state_est_sub.get()
+            s_est, v_est, cur_lap, dist_to_start, dist_to_finish = self.state_est_sub.get()
             # if self.start_crossed:
             #     rospy.loginfo('race manager periodic: start crossed')
             # if self.finish_crossed:
@@ -78,6 +89,7 @@ class Node:
             rospy.loginfo_throttle(1., 'NoRXMsgException')
         except trr_rpu.RXMsgTimeoutException:
             rospy.loginfo_throttle(1., 'RXMsgTimeoutException')
+        self.status_pub.publish(self)
             
     def set_guidance_mode(self, mode):
         mode_name = ['Idle', 'Stop', 'Drive']

@@ -1,13 +1,23 @@
 import sys, numpy as np
-import cv2, cv_bridge
+import cv2, cv_bridge, tf
 import rospy, sensor_msgs.msg, visualization_msgs.msg, geometry_msgs.msg, nav_msgs.msg
 import pdb
 
-import smocap # for cameras
+#
+# A bunch of utilities to deal with ROS
+#   - publishers and listeners for our messages
+#   - skeletons for common nodes
+#
+
+
+import smocap # for cameras, needs to go
 import smocap.rospy_utils
 import two_d_guidance.msg
+import trr.msg
 
-
+def list_of_xyz(p): return [p.x, p.y, p.z]
+def array_of_xyz(p): return np.array(list_of_xyz(p))
+def list_of_xyzw(q): return [q.x, q.y, q.z, q.w]
 def msgPoint(x, y, z): p = geometry_msgs.msg.Point(); p.x=x; p.y=y;p.z=z; return p
 
 class NoRXMsgException(Exception): pass
@@ -38,6 +48,31 @@ class SimpleSubscriber:
             raise RXMsgTimeoutException
         return self.msg
 
+#
+# Race Manager Status
+#
+def RaceManagerStatusStr(_i): return ['Staging', 'Ready', 'Racing', 'Finished', 'JoinStart'][_i]
+class RaceManagerStatusPublisher(SimplePublisher):
+    def __init__(self, topic='trr_race_manager/status'):
+        SimplePublisher.__init__(self, topic, trr.msg.RaceManagerStatus, 'race manager') 
+
+    def publish(self, src):
+        msg = trr.msg.RaceManagerStatus()
+        msg.mode = src.mode
+        msg.cur_lap = src.cur_lap
+        msg.tot_lap = src.nb_lap
+        SimplePublisher.publish(self, msg)
+
+
+class RaceManagerStatusSubscriber(SimpleSubscriber):
+    def __init__(self, topic='trr_race_manager/status', what='N/A', timeout=0.1, user_callback=None):
+        SimpleSubscriber.__init__(self, topic, trr.msg.RaceManagerStatus, what, timeout, user_callback)
+
+    def get(self):
+        msg = SimpleSubscriber.get(self) # raise exceptions
+        return msg.mode, msg.cur_lap, msg.tot_lap
+
+        
 #
 # StartFinish
 #
@@ -103,16 +138,47 @@ class TrrStateEstimationSubscriber(SimpleSubscriber):
         return msg.s, msg.v, msg.cur_lap, msg.dist_to_start, msg.dist_to_finish 
 
 #
+# Lanes
+# 
+class LaneModelPublisher:
+    def __init__(self, topic):
+        rospy.loginfo(' publishing lane model on ({})'.format(topic))
+        self.pub = rospy.Publisher(topic, two_d_guidance.msg.LaneModel, queue_size=1)
+
+    def publish(self, lm):
+        msg = two_d_guidance.msg.LaneModel()
+        msg.poly = lm.coefs
+        self.pub.publish(msg)
+
+        
+class LaneModelSubscriber:
+    def __init__(self, topic, cbk=None):
+        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.LaneModel, self.msg_callback, queue_size=1)
+        rospy.loginfo(' subscribed to ({})'.format(topic))
+        self.msg = None
+        self.timeout = 0.5
+        
+    def msg_callback(self, msg):
+        self.msg = msg
+        self.last_msg_time = rospy.get_rostime()
+
+    def get(self, lm):
+        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
+            lm.coefs = self.msg.poly
+            lm.set_valid(True)
+        else:
+            lm.set_valid(False)
+
+#
 # Odometry
 #               
 class OdomListener(SimpleSubscriber):
     def __init__(self, topic='/caroline/diff_drive_controller/odom', what='N/A', timeout=0.1, user_cbk=None):
         SimpleSubscriber.__init__(self, topic, nav_msgs.msg.Odometry, what, timeout, user_cbk)
-        self.lin, self.ang = 0, 0
         
-    def get(self):
-        msg = SimpleSubscriber.get(self)
-        return msg.twist.twist.linear.x, msg.twist.twist.angular.z
+    # def get(self):
+    #     msg = SimpleSubscriber.get(self)
+    #     return msg.twist.twist.linear.x, msg.twist.twist.angular.z
 
     def get_vel(self):
         msg = SimpleSubscriber.get(self)
@@ -126,8 +192,44 @@ class OdomListener(SimpleSubscriber):
         msg = SimpleSubscriber.get(self)
         return np.array([msg.pose.pose.position.x, msg.pose.pose.position.y])
 
+    def get_loc_and_yaw(self):
+        msg = SimpleSubscriber.get(self)
+        l = array_of_xyz(msg.pose.pose.position)[:2]
+        y = tf.transformations.euler_from_quaternion(list_of_xyzw(msg.pose.pose.orientation))[2]
+        return l, y
     
-        
+#
+# Traffic light
+#   
+class TrrTrafficLightPublisher:
+    def __init__(self, topic='trr_vision/traffic_light/status'):
+        rospy.loginfo(' publishing traffic light status on ({})'.format(topic))
+        self.pub = rospy.Publisher(topic, two_d_guidance.msg.TrrTrafficLight, queue_size=1)
+    def publish(self, pl):
+        msg = two_d_guidance.msg.TrrTrafficLight()
+        msg.red, msg.yellow, msg.green = pl.get_light_status()
+        self.pub.publish(msg)
+
+class TrrTrafficLightSubscriber:
+    def __init__(self, topic='trr_vision/traffic_light/status'):
+        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.TrrTrafficLight, self.msg_callback, queue_size=1)
+        rospy.loginfo(' subscribed to ({})'.format(topic))
+        self.msg = None
+        self.timeout = 0.5     
+
+    def msg_callback(self, msg):
+        self.msg = msg
+        self.last_msg_time = rospy.get_rostime()
+
+    def get(self):
+        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
+            return self.msg.red, self.msg.yellow, self.msg.green
+        else: return False, False, False
+
+#
+# Images
+#
+       
 class ImgPublisher:
     def __init__(self, cam, img_topic = "/trr_vision/start_finish/image_debug"):
         rospy.loginfo(' publishing image on ({})'.format(img_topic))
@@ -154,38 +256,41 @@ class CompressedImgPublisher:
         msg.format = "jpeg"
         msg.data = np.array(cv2.imencode('.jpg', img_bgr)[1]).tostring()
         self.image_pub.publish(msg)
-        
-
-class TrrTrafficLightPublisher:
-    def __init__(self, topic='trr_vision/traffic_light/status'):
-        rospy.loginfo(' publishing traffic light status on ({})'.format(topic))
-        self.pub = rospy.Publisher(topic, two_d_guidance.msg.TrrTrafficLight, queue_size=1)
-    def publish(self, pl):
-        msg = two_d_guidance.msg.TrrTrafficLight()
-        msg.red, msg.yellow, msg.green = pl.get_light_status()
-        self.pub.publish(msg)
-
-class TrrTrafficLightSubscriber:
-    def __init__(self, topic='trr_vision/traffic_light/status'):
-        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.TrrTrafficLight, self.msg_callback, queue_size=1)
-        rospy.loginfo(' subscribed to ({})'.format(topic))
-        self.msg = None
-        self.timeout = 0.5     
-
-    def msg_callback(self, msg):
-        self.msg = msg
-        self.last_msg_time = rospy.get_rostime()
-
-    def get(self):
-        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
-            return self.msg.red, self.msg.yellow, self.msg.green
-        else: return False, False, False
-
-
 
         
-           
-                
+#
+# Markers
+#       
+
+
+class LaneModelMarkerPublisher:
+    def __init__(self, topic, ref_frame="nono_0/base_link_footprint",
+                 color=(1., 0., 1., 0.)):
+        self.pub_lane = rospy.Publisher(topic, visualization_msgs.msg.Marker, queue_size=1)
+        rospy.loginfo(' publishing lane model markers on ({})'.format(topic))
+        self.lane_msg = visualization_msgs.msg.Marker()
+        self.lane_msg.header.frame_id = ref_frame
+        self.lane_msg.type = self.lane_msg.LINE_STRIP
+        self.lane_msg.action = self.lane_msg.ADD
+        self.lane_msg.id = 0
+        self.lane_msg.text = 'lane'
+        s = self.lane_msg.scale; s.x, s.y, s.z = 0.01, 0.2, 0.2
+        c = self.lane_msg.color; c.a, c.r, c.g, c.b = color
+        o = self.lane_msg.pose.orientation; o.x, o.y, o.z, o.w = 0, 0, 0, 1
+
+    def publish(self, lm, l0=0.6, l1=1.8):
+        #pts = [[0, 0, 0], [0.1, 0, 0], [0.2, 0.1, 0]]
+        try:
+            l0, l1 = lm.x_min, lm.x_max
+        except AttributeError: pass
+        pts = [[x, lm.get_y(x), 0] for x in np.linspace(l0, l1, 10)]
+        self.lane_msg.points = []
+        for p in pts:
+            _p = geometry_msgs.msg.Point()
+            _p.x, _p.y, _p.z = p
+            self.lane_msg.points.append(_p)
+        self.pub_lane.publish( self.lane_msg)  
+
 
 class ContourPublisher:
     def __init__(self, frame_id='caroline/base_link_footprint', topic='/contour',
@@ -278,3 +383,19 @@ class DebugImgPublisher:
             self.img_rgb = cv2.cvtColor(self.img_bgr, cv2.COLOR_BGR2RGB)
             #img_rgb = self.img[...,::-1] # rgb = bgr[...,::-1] OpenCV image to Matplotlib
             self.image_pub.publish2(self.img_rgb)
+
+
+
+class PeriodicNode:
+
+    def __init__(self, name):
+        rospy.init_node(name)
+    
+    def run(self, freq):
+        rate = rospy.Rate(freq)
+        try:
+            while not rospy.is_shutdown():
+                self.periodic()
+                rate.sleep()
+        except rospy.exceptions.ROSInterruptException:
+            pass

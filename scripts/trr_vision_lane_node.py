@@ -47,9 +47,9 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
             self.be_pub = BirdEyePublisher(self.ref_frame, self.pipeline.bird_eye, '/trr_vision/lane/bird_eye')
         except AttributeError:
             self.be_pub = None
-        self.lane_model_marker_pub = trru.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=self.ref_frame)
+        self.lane_model_marker_pub = trr_rpu.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=self.ref_frame)
         # Model publishing
-        self.lane_model_pub = trru.LaneModelPublisher('/trr_vision/lane/detected_model')
+        self.lane_model_pub = trr_rpu.LaneModelPublisher('/trr_vision/lane/detected_model')
         self.lane_model = trru.LaneModel()
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_laneConfig, self.cfg_callback)
         # TODO: start image subscription only here

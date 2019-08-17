@@ -6,7 +6,7 @@ import nav_msgs.msg , geometry_msgs.msg#, visualization_msgs.msg, sensor_msgs.ms
 
 import two_d_guidance.trr.utils as trr_u
 import two_d_guidance.trr.rospy_utils as trr_rpu
-
+import two_d_guidance.trr.guidance as trr_gui
 import two_d_guidance.cfg.trr_guidanceConfig  # dynamic reconfigure
 
 import pdb
@@ -14,67 +14,11 @@ import pdb
 
         
 
-class VelCtl:
-    mode_cst, mode_curv, mode_nb = range(3)
-    def __init__(self):
-        self.mode = VelCtl.mode_cst#VelCtl.mode_curv#
-        self.sp = 1.
-        self.min_sp = 0.2
-        self.k_curv = 0.5
 
-    def get(self, lane_model):
-        if self.mode == VelCtl.mode_cst:
-            return self.sp
-        else:
-            curv = lane_model.coefs[1]
-            return max(self.min_sp, self.sp-np.abs(curv)*self.k_curv)
-
-class CstLookahead:
-    def __init__(self, _d=0.4): self.d = _d
-    def set_dist(self, _d): self.d = _d
-    def set_time(self, _t): pass
-    def get_dist(self, _v): return self.d
-
-class TimeCstLookahead:
-    def __init__(self, _t=0.4): self.t = _t
-    def set_dist(self, _d): pass
-    def set_time(self, _t): self.t = _t
-    def get_dist(self, _v): return _v*self.t
-        
-class Guidance:
-    mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
-    mode_lookahead_dist, mode_lookahead_time = range(2)
-    def __init__(self, lookahead=0.4, vel_sp=0.2):
-        self.set_mode(Guidance.mode_idle)
-        self.lookaheads = [CstLookahead(), TimeCstLookahead()]
-        self.lookahead_mode = Guidance.mode_lookahead_dist
-        self.lookahead_dist = 0.1
-        self.lookahead_time = 0.1
-        self.carrot = [self.lookahead_dist, 0]
-        self.R = np.inf
-        self.vel_ctl = VelCtl()
-        self.vel_sp = vel_sp
-    
-    def compute(self, lane_model, s=float('inf'), expl_noise=0.025, dy=0.):
-        lin = self.vel_ctl.get(lane_model)
-        if s > 15.5 and s < 16.: dy += 0.25
-        elif s > 0.5 and s < 1.: dy -= 0.25
-        self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
-        self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
-        self.carrot = [self.lookahead_dist, lane_model.get_y(self.lookahead_dist)+dy]
-        self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
-        lin, ang = lin, lin/self.R
-        ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
-        return lin, ang
-
-    def set_mode(self, mode):
-        rospy.loginfo('guidance setting mode to {}'.format(mode))
-        self.mode = mode
-    
 
 class Publisher:
     def __init__(self, topic='trr_guidance/status', cmd_topic='trr_guidance/cmd'):
-        self.sta_pub = trr_rpu.SimplePublisher(topic, two_d_guidance.msg.FLGuidanceStatus, "controller commands")
+        self.sta_pub = trr_rpu.SimplePublisher(topic, two_d_guidance.msg.FLGuidanceStatus, "guidance status")
         self.pub = rospy.Publisher(topic, two_d_guidance.msg.FLGuidanceStatus, queue_size=1)
         self.pub_cmd = rospy.Publisher(cmd_topic, geometry_msgs.msg.Twist, queue_size=1)
 
@@ -104,13 +48,16 @@ class Node:
         self.hf_loop_idx, self.low_freq_div = 0, 6
         self.lin_sp, self.ang_sp = 0.,0.
         self.lane_model = trr_u.LaneModel()
-        self.guidance = Guidance(lookahead=0.6)
+
+        tdg_dir = rospkg.RosPack().get_path('two_d_guidance')
+        fname = os.path.join(tdg_dir, 'paths/demo_z/track_trr_real_vel.npz')
+        self.guidance = trr_gui.Guidance(lookahead=0.6, path_fname=fname)
+
         cmd_topic = rospy.get_param('~cmd_topic', '/caroline/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.cfg_callback)
-        self.lane_model_sub = trr_u.LaneModelSubscriber('/trr_vision/lane/detected_model')
-        self.odom_sub = trr_rpu.OdomListener(what='guidance')
+        self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
         
 
@@ -130,8 +77,8 @@ class Node:
         self.lane_model_sub.get(self.lane_model)
         try:
             _s, _v, _l, _ds, _df = self.state_est_sub.get()
-            if self.guidance.mode != Guidance.mode_idle:
-                if self.guidance.mode == Guidance.mode_driving and self.lane_model.is_valid():
+            if self.guidance.mode != trr_gui.Guidance.mode_idle:
+                if self.guidance.mode == trr_gui.Guidance.mode_driving and self.lane_model.is_valid():
                     self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, _s, expl_noise=0.)
                 else:
                     self.lin_sp, self.ang_sp = 0, 0

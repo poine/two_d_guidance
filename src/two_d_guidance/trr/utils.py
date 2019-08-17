@@ -9,6 +9,28 @@ import two_d_guidance.ros_utils as ros_utils
 import two_d_guidance.msg
 
 
+def norm_mpi_pi(v): return ( v + np.pi) % (2 * np.pi ) - np.pi
+
+#
+# This is a specialized version of a path including a velocity profile
+#
+class TrrPath(tdg.path.Path):
+    def __init__(self, path_filename, v=0.6):
+        tdg.path.Path.__init__(self)
+        data = self.load(path_filename)
+        try:
+            self.vels = data['vels']
+        except KeyError:
+            print(' -no velocities in archive, setting them to zero')
+            self.vels = v*np.ones(len(self.points))
+            
+            
+    def save(self, filename):
+        print('saving path to {}'.format(filename))
+        np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels)
+
+
+
 class LaneModel:
     # center line as polynomial
     # y = an.x^n + ...
@@ -35,63 +57,6 @@ class LaneModel:
                 cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), (0,128,0), 4)
             except OverflowError:
                 pass
-
-class LaneModelPublisher:
-    def __init__(self, topic):
-        rospy.loginfo(' publishing lane model on ({})'.format(topic))
-        self.pub = rospy.Publisher(topic, two_d_guidance.msg.LaneModel, queue_size=1)
-
-    def publish(self, lm):
-        msg = two_d_guidance.msg.LaneModel()
-        msg.poly = lm.coefs
-        self.pub.publish(msg)
-
-        
-class LaneModelSubscriber:
-    def __init__(self, topic):
-        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.LaneModel, self.msg_callback, queue_size=1)
-        rospy.loginfo(' subscribed to ({})'.format(topic))
-        self.msg = None
-        self.timeout = 0.5
-        
-    def msg_callback(self, msg):
-        self.msg = msg
-        self.last_msg_time = rospy.get_rostime()
-
-    def get(self, lm):
-        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
-            lm.coefs = self.msg.poly
-            lm.set_valid(True)
-        else:
-            lm.set_valid(False)
-
-class LaneModelMarkerPublisher:
-    def __init__(self, topic, ref_frame="nono_0/base_link_footprint",
-                 color=(1., 0., 1., 0.)):
-        self.pub_lane = rospy.Publisher(topic, visualization_msgs.msg.Marker, queue_size=1)
-        rospy.loginfo(' publishing lane model markers on ({})'.format(topic))
-        self.lane_msg = visualization_msgs.msg.Marker()
-        self.lane_msg.header.frame_id = ref_frame
-        self.lane_msg.type = self.lane_msg.LINE_STRIP
-        self.lane_msg.action = self.lane_msg.ADD
-        self.lane_msg.id = 0
-        self.lane_msg.text = 'lane'
-        s = self.lane_msg.scale; s.x, s.y, s.z = 0.01, 0.2, 0.2
-        c = self.lane_msg.color; c.a, c.r, c.g, c.b = color
-        o = self.lane_msg.pose.orientation; o.x, o.y, o.z, o.w = 0, 0, 0, 1
-
-    def publish(self, lm, l0=0.6, l1=1.8):
-        #pts = [[0, 0, 0], [0.1, 0, 0], [0.2, 0.1, 0]]
-        try:
-            l0, l1 = lm.x_min, lm.x_max
-        except AttributeError: pass
-        pts = [[x, lm.get_y(x), 0] for x in np.linspace(l0, l1, 10)]
-        self.lane_msg.points = []
-        for p in pts:
-            _p = geometry_msgs.msg.Point()
-            _p.x, _p.y, _p.z = p
-            self.lane_msg.points.append(_p)
-        self.pub_lane.publish( self.lane_msg)  
 
             
 class FakeLineDetector:

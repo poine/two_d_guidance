@@ -55,6 +55,7 @@ class Path:
         except KeyError:
             print(' -no curvatures in archive, computing them')
             self.compute_curvatures()
+        return data
 
     def save(self, filename):
         print('saving path to {}'.format(filename))
