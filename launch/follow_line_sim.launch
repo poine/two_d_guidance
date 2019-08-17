@@ -121,6 +121,9 @@
       <param name="cameras" value="$(arg robot_name)/camera_road_front"/>
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
     </node>
+    <node name="race_manager_display" pkg="trr" type="race_manager_display.py" >
+      <param name="robot_name" value="$(arg robot_name)"/>
+    </node>
   </group>
   
   <!--  ****** Guidance *****  -->
