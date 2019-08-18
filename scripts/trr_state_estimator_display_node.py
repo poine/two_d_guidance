@@ -32,11 +32,11 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
         cv2.putText(img_bgr, 'State Est', (y0, 40), f, h, c, w)
         cv2.polylines(img_bgr, [self.path_points], isClosed=True, color=(255, 0, 0), thickness=2)
         try:
-            s_est, v_est, cur_lap, dist_start, dist_to_finish = model.get()
+            s_est, idx_s, v_est, dist_start, dist_to_finish = model.get()
         
-            cv2.putText(img_bgr, 's: {:.2f}m'.format(s_est), (y0, 90), f, h, c, w)
+            cv2.putText(img_bgr, 's: {:.2f}m ({})'.format(s_est, idx_s), (y0, 90), f, h, c, w)
             cv2.putText(img_bgr, 'v: {:.1f}m/s'.format(v_est), (y0, 140), f, h, c, w)
-            cv2.putText(img_bgr, 'lap: {:d}'.format(cur_lap), (y0, 190), f, h, c, w)
+            #cv2.putText(img_bgr, 'lap: {:d}'.format(cur_lap), (y0, 190), f, h, c, w)
         
             p_est_idx, p_est = path.find_point_at_dist_from_idx(0, _d=s_est)
             if p_est is not None: # FIXME, used looped version

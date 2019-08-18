@@ -117,17 +117,13 @@ class TrrStateEstimationPublisher(SimplePublisher):
     def __init__(self, topic='trr_state_est/status'):
         SimplePublisher.__init__(self, topic, two_d_guidance.msg.TrrStateEst, 'state estimation')
 
-    def publish(self, model, start_crossed, finish_crossed):
+    def publish(self, model):
         msg = self.msg_class()
         msg.s = model.sn
+        msg.idx_s = model.idx_sn
         msg.v = model.v
-        msg.cur_lap = model.cur_lap
-        msg.start_crossed  = start_crossed
-        msg.finish_crossed  = finish_crossed
         msg.dist_to_finish = model.predicted_dist_to_finish
         msg.dist_to_start  = model.predicted_dist_to_start
-        msg.dist_to_finish = model.predicted_dist_to_finish
-        msg.s = model.sn
         SimplePublisher.publish(self, msg)
 
 class TrrStateEstimationSubscriber(SimpleSubscriber):
@@ -136,7 +132,7 @@ class TrrStateEstimationSubscriber(SimpleSubscriber):
 
     def get(self):
         msg = SimpleSubscriber.get(self)
-        return msg.s, msg.v, msg.cur_lap, msg.dist_to_start, msg.dist_to_finish 
+        return msg.s, msg.idx_s, msg.v, msg.dist_to_start, msg.dist_to_finish 
 
 #
 # Lanes

@@ -13,11 +13,13 @@ import two_d_guidance.srv
 class Node:
 
     def __init__(self, autostart=False):
-        self.estimator = trr_se.StateEstimator(self.on_lm_passed)
+        tdg_dir = rospkg.RosPack().get_path('two_d_guidance')
+        default_path_filename = os.path.join(tdg_dir, 'paths/demo_z/track_trr_real.npz')
+        path_filename = rospy.get_param('~path_filename', default_path_filename)
+        self.estimator = trr_se.StateEstimator(path_filename, self.on_lm_passed)
         self.lane_model = trr_u.LaneModel()
         self.state_est_pub = trr_rpu.TrrStateEstimationPublisher('trr_state_est/status')
-        # for now we just send one message - maybe we switch to a service call if that proves icky (lost message)
-        self.start_crossed, self.finish_crossed = False, False
+        # we call race manager's  LandmarkPassed service to notify start/finish line crossing
         srv_topic = 'LandmarkPassed'
         print('Waiting for service: {}'.format(srv_topic))
         rospy.wait_for_service(srv_topic)
@@ -50,8 +52,6 @@ class Node:
         
     def on_lm_passed(self, lm_id):
         rospy.loginfo('### on_lm_passed: passed {}'.format(self.estimator.path.lm_names[lm_id]))
-        if   lm_id == self.estimator.path.LM_START:  self.start_crossed  = True
-        elif lm_id == self.estimator.path.LM_FINISH: self.finish_crossed = True
         try:
             resp1 = self.lm_crossed_srv_proxy(lm_id)
         except rospy.ServiceException, e:
@@ -60,15 +60,10 @@ class Node:
 
         
     def periodic(self):
-        self.state_est_pub.publish(self.estimator, self.start_crossed, self.finish_crossed)
-        self.start_crossed, self.finish_crossed = False, False
+        self.state_est_pub.publish(self.estimator)
 
         self.lane_model_sub.get(self.lane_model)
 
-        #contour_start, contour_finish, dist_to_finish = self.start_finish_sub.get()
-        #lred, lyellow, lgreen = self.traffic_light_sub.get()
-        #print'red {} green {} finish {}'.format(lred, lgreen, dist_to_finish)
-        #print('{}'.format(self.estimator.y))
 
     def run(self, periodic_freq=50.):
         rate = rospy.Rate(periodic_freq)

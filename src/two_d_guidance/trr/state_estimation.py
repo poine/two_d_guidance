@@ -54,7 +54,7 @@ class TrackMark:
             if self.cnt < self.hist: self.cnt+=1 
             if self.cnt == self.hist and not self.crossed:
                 self.crossed = True
-                print('passing lm {}: prev {:.3f} lm {:.3f}'.format(self.name, self.s, s))
+                print('passing lm {}: lm {:.3f} s {:.3f}'.format(self.name, self.s, s))
                 return True
         else:
             if self.cnt > 0: self.cnt -=1
@@ -73,10 +73,10 @@ class TrackMark:
 
 class StateEstimator:
     
-    def __init__(self, lm_passed_cbk=None):
+    def __init__(self, path_fname, lm_passed_cbk=None):
         self.lm_passed_cbk = lm_passed_cbk
-        self.load_path()
-        self.s, self.sn, self.v, self.cur_lap = 0., 0., 0., 0 # abscice, normalized abscice, velocity, current lap
+        self.load_path(path_fname)
+        self.s, self.sn, self.idx_sn, self.v = 0., 0., 0, 0 # abscice, normalized abscice, abscice idx, velocity
         self.k_odom = 1.
         self.lm_pred = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
         self.lm_meas = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
@@ -84,14 +84,11 @@ class StateEstimator:
         self.meas_dist_to_start, self.meas_dist_to_finish = float('inf'), float('inf')
         self.predicted_dist_to_start, self.predicted_dist_to_finish = float('inf'), float('inf')
         self.start_residual, self.finish_residual = float('inf'), float('inf')
-        self.start_track = TrackMark(self.path.lm_start_s, 'start')
-        self.finish_track = TrackMark(self.path.lm_finish_s, 'finish')
+        self.start_track = TrackMark(self.path.lm_start_s, 'start', hist=2)
+        self.finish_track = TrackMark(self.path.lm_finish_s, 'finish', hist=2)
         self.last_stamp = None
 
-    def load_path(self):
-        tdg_dir = rospkg.RosPack().get_path('two_d_guidance')
-        default_path_filename = os.path.join(tdg_dir, 'paths/demo_z/track_trr_real.npz')
-        path_filename = rospy.get_param('~path_filename', default_path_filename)
+    def load_path(self, path_filename):
         rospy.loginfo(' loading path: {}'.format(path_filename))
         self.path = StateEstPath(path_filename)
         self.path.report()
@@ -102,11 +99,11 @@ class StateEstimator:
         self.s += ds
         self.prev_sn = self.sn
         self.sn = self._norm_s(self.s)
+        self.idx_sn, _ = self.path.find_point_at_dist_from_idx(0, _d=self.sn)
         
         if self.start_track.update(self.sn) and self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_START)
 
         if self.finish_track.update(self.sn):
-            self.cur_lap += 1
             if self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_FINISH)
             
         
@@ -143,44 +140,18 @@ class StateEstimator:
             self.lm_res[lm_id] = float('inf')
             
     def update_landmarks(self, meas_dist_to_start, meas_dist_to_finish, gain=0.075, disable_correction=False):
+
         #print('meas start {} meas finish {}'.format(meas_dist_to_start, meas_dist_to_finish))
         self.meas_dist_to_start, self.meas_dist_to_finish = meas_dist_to_start, meas_dist_to_finish
-        # if not math.isinf(meas_dist_to_finish) or disable_correction:
-        #     self.predicted_dist_to_finish = self.path.lm_finish_s-self.sn
-        #     self.finish_residual = self._norm_s_err(meas_dist_to_finish - self.predicted_dist_to_finish)
-        #     self.finish_residual = np.clip(self.finish_residual, -0.5, 0.5)
-        #     ds = -gain*self.finish_residual
-        #     self._update_s(ds)
-        # else:
-        #     self.predicted_dist_to_finish = float('inf')
-        #     self.finish_residual = float('inf')
+
         self.update_landmark(self.path.LM_FINISH, meas_dist_to_finish)
         self.predicted_dist_to_finish = self.lm_pred[self.path.LM_FINISH]
         if self.lm_res[self.path.LM_FINISH] == float('inf'): self.predicted_dist_to_finish = float('inf')
         
-        # if not math.isinf(meas_dist_to_start) or disable_correction:
-        #     self.predicted_dist_to_start = self.path.lm_start_s-self.sn
-        #     self.start_residual = self._norm_s_err(meas_dist_to_start - self.predicted_dist_to_start)
-        #     self.start_residual = np.clip(self.start_residual, -0.5, 0.5)
-        #     ds = -gain*self.start_residual
-        #     self._update_s(ds)
-        # else:
-        #     self.predicted_dist_to_start = float('inf')
-        #     self.start_residual = float('inf')
-
         self.update_landmark(self.path.LM_START, meas_dist_to_start)
         self.predicted_dist_to_start = self.lm_pred[self.path.LM_START]
         if self.lm_res[self.path.LM_START] == float('inf'): self.predicted_dist_to_start = float('inf')
             
-        
-    def _status(self):
-        txt  = 'state_est: sn {:.3f} s {:.3f}\n'.format(self.sn, self.s)
-        #try:
-        txt += '  start s: {:.2f} finish s: {:.2f}\n'.format(self.path.lm_start_s, self.path.lm_finish_s)
-        txt += '  dist_to_finish meas {:.2f} pred {:.2f} res {}\n'.format(self.meas_dist_to_finish, self.predicted_dist_to_finish, self.finish_residual)
-        txt += '  dist_to_start meas {:.2f} pred {:.2f} res {}\n'.format(self.meas_dist_to_start, self.predicted_dist_to_start, self.start_residual)
-        #except AttributeError: pass
-        return txt
     
     def status(self): return self.sn, self.v
 

@@ -76,10 +76,10 @@ class Node:
     def periodic(self):
         self.lane_model_sub.get(self.lane_model)
         try:
-            _s, _v, _l, _ds, _df = self.state_est_sub.get()
+            _s, _is, _v, _ds, _df = self.state_est_sub.get()
             if self.guidance.mode != trr_gui.Guidance.mode_idle:
                 if self.guidance.mode == trr_gui.Guidance.mode_driving and self.lane_model.is_valid():
-                    self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, _s, expl_noise=0.)
+                    self.lin_sp, self.ang_sp =  self.guidance.compute(self.lane_model, _s, _is, expl_noise=0.)
                 else:
                     self.lin_sp, self.ang_sp = 0, 0
                 self.publisher.publish_cmd(self.lin_sp, self.ang_sp)
