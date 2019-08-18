@@ -61,6 +61,7 @@ class RaceManagerStatusPublisher(SimplePublisher):
         msg.mode = src.mode
         msg.cur_lap = src.cur_lap
         msg.tot_lap = src.nb_lap
+        msg.lap_times = src.lap_times
         SimplePublisher.publish(self, msg)
 
 
@@ -70,7 +71,7 @@ class RaceManagerStatusSubscriber(SimpleSubscriber):
 
     def get(self):
         msg = SimpleSubscriber.get(self) # raise exceptions
-        return msg.mode, msg.cur_lap, msg.tot_lap
+        return msg.mode, msg.cur_lap, msg.tot_lap, msg.lap_times
 
         
 #
@@ -364,12 +365,11 @@ class TrrSimpleVisionPipeNode:
 
 
 class DebugImgPublisher:
-    def __init__(self, topic_src, topic_sink):
-        #self.image_pub = rospy.Publisher(topic_sink+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
+    def __init__(self, cam_name, topic_sink):
         self.image_pub = CompressedImgPublisher(cam=None, img_topic=topic_sink)
 
         self.img, self.compressed_img = None, None
-        img_src_topic = topic_src + '/image_raw/compressed'
+        img_src_topic = cam_name + '/image_raw/compressed'
         self.img_sub = rospy.Subscriber(img_src_topic, sensor_msgs.msg.CompressedImage, self.img_cbk,  queue_size = 1)
         rospy.loginfo(' subscribed to ({})'.format(img_src_topic))
 
@@ -377,6 +377,9 @@ class DebugImgPublisher:
         self.compressed_img = np.fromstring(msg.data, np.uint8)
 
     def publish(self, model, user_data):
+        n_subscriber = self.image_pub.image_pub.get_num_connections()
+        # don't bother drawing and publishing if noone is listening
+        if n_subscriber <= 0: return
         if self.compressed_img is not None:
             self.img_bgr = cv2.imdecode(self.compressed_img, cv2.IMREAD_COLOR)
             self._draw(self.img_bgr, model, user_data)

@@ -75,14 +75,16 @@ class BirdEyeTransformer:
         self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h))
         return self.unwarped_img
 
-    def draw_debug(self, cam, img=None, lane_model=None, cnt_be=None, border_color=128, fill_color=(255, 0, 255)):
+    def draw_debug(self, cam, img=None, lane_model=None, cnts_be=None, border_color=128, fill_color=(255, 0, 255)):
         if img is None:
             img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
         elif img.dtype == np.uint8:
             img = img.astype(np.float32)/255.
-        if  cnt_be is not None:
-            cv2.drawContours(img, cnt_be, -1, (255,0,255), 3)
-            cv2.fillPoly(img, pts =[cnt_be], color=fill_color)
+        if  cnts_be is not None:
+            for cnt_be in cnts_be:
+                cnt_be_int = cnt_be.astype(np.int32)
+                cv2.drawContours(img, cnt_be_int, -1, (255,0,255), 3)
+                cv2.fillPoly(img, pts =[cnt_be_int], color=fill_color)
         if lane_model is not None and lane_model.is_valid():
             self.draw_line(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
         out_img = change_canvas(img, cam.h, cam.w)
@@ -193,11 +195,12 @@ class ColoredBlobDetector:
             else: return img
 
 class ContourFinder:
-    def __init__(self, min_area=None):
+    def __init__(self, min_area=None, single_contour=False):
+        self.min_area = min_area
+        self.single_contour = single_contour
         self.img = None
         self.cnt_max = None
         self.cnt_max_area = 0
-        self.min_area = min_area
 
     def has_contour(self): return (self.cnt_max is not None)
     def get_contour(self): return self.cnt_max
@@ -211,10 +214,10 @@ class ContourFinder:
             self.cnt_max_area = cv2.contourArea(self.cnt_max)
             if self.min_area is not None and self.cnt_max_area < self.min_area:
                self.cnt_max, self.cnt_max_area = None, 0
-
-            if 0:
+            
+            if not self.single_contour:
                 self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
-                self.cnt_areas_order = np.argsort(self.cnt_areas)
+                #self.cnt_areas_order = np.argsort(self.cnt_areas)
                 self.valid_cnts_idx = self.cnt_areas > self.min_area
                 self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
                

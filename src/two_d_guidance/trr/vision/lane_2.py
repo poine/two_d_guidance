@@ -18,6 +18,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.display_mode = Contour2Pipeline.show_be
         self.img = None
         self.cnt_max_be = None
+        self.use_single_contour = False
 
     def set_roi(self, tl, br):
         print('roi: {} {}'.format(tl, br))
@@ -32,22 +33,28 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.thresholder.process(self.img_gray)
         self.contour_finder.process(self.thresholder.threshold)
         if self.contour_finder.has_contour():
-            cnt_max_noroi = self.contour_finder.get_contour() + self.tl
-            cnt_max_imp = cam.undistort_points(cnt_max_noroi.astype(np.float32))
-            #cnt_max_imp = cam.undistort_points2(self.contour_finder.cnt_max.astype(np.float32)) # TODO
-            self.cnt_max_be = self.bird_eye.points_imp_to_be(cnt_max_imp)
-            self.cnt_max_lfp = self.bird_eye.unwarped_to_fp(cam, self.cnt_max_be)
-            self.lane_model.fit(self.cnt_max_lfp[:,:2])
-            self.lane_model.set_valid(True)
-
-            if 0:
+            if self.use_single_contour:
+                cnt_max_noroi = self.contour_finder.get_contour() + self.tl
+                cnt_max_imp = cam.undistort_points(cnt_max_noroi.astype(np.float32))
+                #cnt_max_imp = cam.undistort_points2(self.contour_finder.cnt_max.astype(np.float32)) # TODO
+                self.cnt_max_be = self.bird_eye.points_imp_to_be(cnt_max_imp)
+                self.cnt_max_lfp = self.bird_eye.unwarped_to_fp(cam, self.cnt_max_be)
+                self.lane_model.fit(self.cnt_max_lfp[:,:2])
+                self.lane_model.set_valid(True)
+            else:
                 self.cnts_be, self.cnts_lfp = [], []
                 for c in self.contour_finder.valid_cnts:
                     cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
-                    cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
-                    self.cnts_be.append(cnt_be)
-                    cnt_lfp = self.bird_eye.unwarped_to_fp(cam, cnt_be)
-                    self.cnts_lfp.append(cnt_lfp)
+                    self.cnts_be.append(self.bird_eye.points_imp_to_be(cnt_imp))
+                    self.cnts_lfp.append(self.bird_eye.unwarped_to_fp(cam, self.cnts_be[-1]))
+                if len(self.cnts_lfp)>1:
+                    sum_ctr_lfp = np.append(self.cnts_lfp[0], (self.cnts_lfp[1]), axis=0)
+                else:
+                    sum_ctr_lfp = self.cnts_lfp[0]
+                self.lane_model.fit(sum_ctr_lfp[:,:2])
+                self.lane_model.set_valid(True)
+                #pdb.set_trace()
+                    
             
         else:
             self.lane_model.set_valid(False)
@@ -62,15 +69,14 @@ class Contour2Pipeline(trr_vu.Pipeline):
             roi_img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
         elif self.display_mode == Contour2Pipeline.show_contour:
             roi_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            self.contour_finder.draw(roi_img)
+            self.contour_finder.draw(roi_img, draw_all=True)
         elif self.display_mode == Contour2Pipeline.show_be:
             try:
-                debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnt_max_be.astype(np.int32))
+                if self.use_single_contour:
+                    debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, [self.cnt_max_be])
+                else:
+                    debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnts_be)
                 #debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, None)
-                if 0:
-                    for cnt_be in self.cnts_be:
-                        print cnt_be
-                        cv2.drawContours(debug_img, cnt_be, -1, (128,128,255), 3)
             except AttributeError:
                 debug_img = np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         if self.display_mode not in [Contour2Pipeline.show_input, Contour2Pipeline.show_be] :
@@ -81,6 +87,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
         cv2.putText(debug_img, 'Lane detection 2', (20, 40), f, h, c, w)
-        self.draw_timing(debug_img, y0=90)
+        self.draw_timing(debug_img, x0=360, y0=40)
+        cv2.putText(debug_img, 'valid contours: {}'.format(len(self.contour_finder.valid_cnts)), (20, 90), f, h, c, w)
         # we return a RGB image
         return cv2.cvtColor(debug_img, cv2.COLOR_BGR2RGB)
