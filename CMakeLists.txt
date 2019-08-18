@@ -100,7 +100,7 @@ generate_messages(
     cfg/trr_vision_lane.cfg
     cfg/trr_vision_start_finish.cfg
     cfg/trr_vision_traffic_light.cfg
-    cfg/trr_race_manager.cfg
+#    cfg/trr_race_manager.cfg
     cfg/trr_world.cfg
  )
 
