@@ -130,9 +130,11 @@
     <node name="trr_guidance_node" pkg="two_d_guidance" type="trr_guidance_node.py" >
       <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
       <param name="cmd_topic" value="$(arg robot_name)/diff_drive_controller/cmd_vel"/>
+      <param name="lookahead" value="0.8"/>
     </node>
     <node name="trr_guidance_display" pkg="two_d_guidance" type="trr_guidance_display_node.py" >
-      <param name="ref_frame" value="$(arg robot_name)/base_link_footprint"/>
+      <param name="robot_name" value="$(arg robot_name)"/>
+      <remap from="/odom" to="/$(arg robot_name)/diff_drive_controller/odom"/>
     </node>
   </group>
 

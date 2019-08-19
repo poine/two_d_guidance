@@ -20,14 +20,18 @@ class TrrPath(tdg.path.Path):
         data = self.load(path_filename)
         try:
             self.vels = data['vels']
+            self.accels = data['accels']
+            self.jerks = data['jerks']
         except KeyError:
-            print(' -no velocities in archive, setting them to zero')
+            print(' -no vel/acc/jerk in archive, setting them to zero')
             self.vels = v*np.ones(len(self.points))
+            self.accels = v*np.ones(len(self.points))
+            self.jerks = v*np.ones(len(self.points))
             
             
     def save(self, filename):
         print('saving path to {}'.format(filename))
-        np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels)
+        np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, jerks=self.jerks)
 
 
 

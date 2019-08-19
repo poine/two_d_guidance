@@ -49,102 +49,73 @@ class MarkerPublisher:
     def publish_lane(self, lm):
         self.pub_lane.publish(lm)
         
-class ImgPublisher:
-    def __init__(self, img_topic = "/trr_guidance/image_debug"):
-        rospy.loginfo(' publishing image on ({})'.format(img_topic))
-        self.image_pub = rospy.Publisher(img_topic+"/compressed", sensor_msgs.msg.CompressedImage, queue_size=1)
-        cam_names = ['/camera_road_front'] #['caroline/camera_road_front']
-        self.img = None
-        #self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
-        self.img_sub = rospy.Subscriber("/camera_road_front/image_raw/compressed", sensor_msgs.msg.CompressedImage, self.img_cbk,  queue_size = 1)
-        self.compressed_img = None
-        
-    def img_cbk(self, msg):
-        self.compressed_img = np.fromstring(msg.data, np.uint8)
-        
-        
-    def on_image(self, img, (cam_idx, stamp, seq)):
-        # store subscribed image (bgr, opencv)
-        self.img = img
-    
-    def publish(self, mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model, lookahead):
-        if self.compressed_img is not None:
-            self.img = cv2.cvtColor(cv2.imdecode(self.compressed_img, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
-            self.draw(mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model, lookahead)
-            img_rgb = self.img[...,::-1] # rgb = bgr[...,::-1] OpenCV image to Matplotlib
-            msg = sensor_msgs.msg.CompressedImage()
-            msg.header.stamp = rospy.Time.now()
-            msg.format = "jpeg"
-            msg.data = np.array(cv2.imencode('.jpg', img_rgb)[1]).tostring()
-            self.image_pub.publish(msg)
+class ImgPublisher(trr_rpu.DebugImgPublisher):
+    def __init__(self, img_topic, cam_name):
+        trr_rpu.DebugImgPublisher.__init__(self, cam_name, img_topic)
+ 
+    def _draw(self, img_bgr, model, data):
+        y0=20; font_color=(128,0,255)
+        f, h1, h2, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, 0.9, font_color, 2
+        cv2.putText(img_bgr, 'Guidance:', (y0, 40), f, h1, c, w)
 
-    def draw(self, mode, lin_sp, lin_odom, ang_sp, ang_odom, lane_model, lookahead):
-        f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1., (0, 255, 0), 2
+        msg = model.guid_stat_sub.get()
         str_of_guid_mode = ['idle', 'stopped', 'driving']
-        cv2.putText(self.img, 'mode: {:s} curv: {:-6.2f}'.format(str_of_guid_mode[mode], lane_model.coefs[1]), (20, 40), f, h, c, w)
+        mode_name, curv = str_of_guid_mode[msg.guidance_mode], msg.poly[1]
+        cv2.putText(img_bgr, 'mode: {:s} curv: {:-6.2f}'.format(mode_name, curv), (20, 90), f, h2, c, w)
+
+        lin_odom, ang_odom = model.odom_sub.get_vel()
+        lin_sp, ang_sp = msg.lin_sp, msg.ang_sp
+        lookahead = msg.lookahead_dist
         lookahead_time = np.inf if lin_sp == 0 else  lookahead/lin_sp
-        cv2.putText(self.img, 'lookahead: {:.2f}m {:.2f}s'.format(lookahead, lookahead_time), (20, 90), f, h, c, w)
-        cv2.putText(self.img, 'lin:  sp/odom {:.2f}/{:.2f} m/s'.format(lin_sp, lin_odom), (20, 140), f, h, c, w)
-        cv2.putText(self.img, 'ang: sp/odom {: 6.2f}/{: 6.2f} deg/s'.format(np.rad2deg(ang_sp), np.rad2deg(ang_odom)), (20, 190), f, h, c, w)
+        cv2.putText(img_bgr, 'lookahead: {:.2f}m {:.2f}s'.format(lookahead, lookahead_time), (20, 140), f, h2, c, w)
+        cv2.putText(img_bgr, 'lin:  sp/odom {:.2f}/{:.2f} m/s'.format(lin_sp, lin_odom), (20, 190), f, h2, c, w)
+        cv2.putText(img_bgr, 'ang: sp/odom {: 6.2f}/{: 6.2f} deg/s'.format(np.rad2deg(ang_sp), np.rad2deg(ang_odom)), (20, 240), f, h2, c, w)
 
 
 
-class GuidanceStatusSubscriber:
-    def __init__(self, topic='trr_guidance/status'):
-        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.FLGuidanceStatus, self.msg_callback, queue_size=1)
-        rospy.loginfo(' subscribed to ({})'.format(topic))
-        self.msg = None
-        self.timeout = 0.5
-        
-    def msg_callback(self, msg):
-        self.msg = msg
-        self.last_msg_time = rospy.get_rostime()
-
-    def get(self, lm):
-        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
-            pass
-            #lm.coefs = self.msg.poly
-            #lm.set_valid(True)
-        else:
-            #lm.set_valid(False)
-            pass
 
 
 
-class Node:
+class Node(trr_rpu.PeriodicNode):
 
     def __init__(self):
-        self.freq = 10
-        ref_frame = rospy.get_param('~ref_frame', 'nono_0/base_link_footprint')
+        trr_rpu.PeriodicNode.__init__(self, 'trr_guidance_display_node')
+        robot_name = rospy.get_param('~robot_name', '')
+        def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
+        cam_name = rospy.get_param('~camera', prefix(robot_name, 'camera_road_front'))
+        ref_frame = rospy.get_param('~ref_frame', prefix(robot_name, 'base_link_footprint'))
         rospy.loginfo(' using ref_frame: {}'.format(ref_frame))
-        self.mark_pub = MarkerPublisher(ref_frame)
-        self.img_pub = ImgPublisher()
-        self.guid_stat_sub = GuidanceStatusSubscriber()
         self.lane_model = trr_u.LaneModel()
+        self.mark_pub = MarkerPublisher(ref_frame)
+        self.img_pub = ImgPublisher("/trr_guidance/image_debug", cam_name)
+        self.guid_stat_sub = trr_rpu.GuidanceStatusSubscriber()
+        self.odom_sub = trr_rpu.OdomListener('/odom', 'guidance_display_node')
         
     def periodic(self):
-        m = self.guid_stat_sub.msg
-        if m is not None:
+        try:
+            m = self.guid_stat_sub.get()
             R, carrot = m.R, [m.carrot_x, m.carrot_y]
             self.mark_pub.publish_carrot(carrot)
             self.mark_pub.publish_arc(R, carrot)
             self.lane_model.coefs = m.poly
             self.mark_pub.publish_lane(self.lane_model)
-            #print self.guid_stat_sub.msg
-            self.img_pub.publish(m.guidance_mode, m.lin_sp, 0., m.ang_sp, 0, self.lane_model, m.lookahead_dist)
+        except trr_rpu.NoRXMsgException :
+            print('guidance display: no Status received from guidance')
+        except trr_rpu.RXMsgTimeoutException :
+            print('guidance display: timeout receiving Status from guidance')
 
-    def run(self):
-        rate = rospy.Rate(self.freq)
         try:
-            while not rospy.is_shutdown():
-                self.periodic()
-                rate.sleep()
-        except rospy.exceptions.ROSInterruptException:
-            pass
+            self.img_pub.publish(self, None)
+        except trr_rpu.NoRXMsgException :
+            print('guidance display im: no Status received from guidance')
+        except trr_rpu.RXMsgTimeoutException :
+            print('guidance display im: timeout receiving Status from guidance')
+
+            
 
 def main(args):
   rospy.init_node('trr_guidance_display_node')
-  Node().run()
+  Node().run(10)
 
 
 if __name__ == '__main__':

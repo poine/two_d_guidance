@@ -73,7 +73,35 @@ class RaceManagerStatusSubscriber(SimpleSubscriber):
         msg = SimpleSubscriber.get(self) # raise exceptions
         return msg.mode, msg.cur_lap, msg.tot_lap, msg.lap_times
 
+
+#
+# Guidance Status
+#
+class GuidanceStatusPublisher(SimplePublisher):
+    def __init__(self, topic='trr/guidance/status', what='N/A', timeout=0.1, user_callback=None):
+        SimplePublisher.__init__(self, topic, two_d_guidance.msg.FLGuidanceStatus, what) # FIXME trr.msg.GuidanceStatus
+
+    def publish(self, model):
+        msg = two_d_guidance.msg.FLGuidanceStatus()
+        msg.guidance_mode = model.mode
+        msg.poly = model.lane.coefs
+        #msg.poly = [0, 1, 0]
+        msg.lookahead_dist = model.lookahead_dist
+        msg.lookahead_time = model.lookahead_time
+        msg.carrot_x, msg.carrot_y = model.carrot
+        msg.R = model.R
+        msg.lin_sp, msg.ang_sp = model.lin_sp, model.ang_sp
+        SimplePublisher.publish(self, msg)
+
+class GuidanceStatusSubscriber(SimpleSubscriber):
+    def __init__(self, topic='trr_guidance/status', what='N/A', timeout=0.1, user_callback=None):
+        SimpleSubscriber.__init__(self, topic, two_d_guidance.msg.FLGuidanceStatus, what, timeout, user_callback)
         
+    # def get(self):
+    #     msg = SimpleSubscriber.get(self) # raise exceptions
+    #     return msg
+
+    
 #
 # StartFinish
 #
@@ -374,7 +402,7 @@ class DebugImgPublisher:
 
     def publish(self, model, user_data):
         n_subscriber = self.image_pub.image_pub.get_num_connections()
-        # don't bother drawing and publishing if noone is listening
+        # don't bother drawing and publishing when no one is listening
         if n_subscriber <= 0: return
         if self.compressed_img is not None:
             self.img_bgr = cv2.imdecode(self.compressed_img, cv2.IMREAD_COLOR)

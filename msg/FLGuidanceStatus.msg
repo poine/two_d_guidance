@@ -1,3 +1,6 @@
+#
+# Guidance Status
+#
 uint8 guidance_mode
 float32[] poly
 float32 lookahead_dist
