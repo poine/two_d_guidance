@@ -88,6 +88,11 @@ class Contour2Pipeline(trr_vu.Pipeline):
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
         cv2.putText(debug_img, 'Lane detection 2', (20, 40), f, h, c, w)
         self.draw_timing(debug_img, x0=360, y0=40)
-        cv2.putText(debug_img, 'valid contours: {}'.format(len(self.contour_finder.valid_cnts)), (20, 90), f, h, c, w)
+        try:
+            nb_valid_contours = len(self.contour_finder.valid_cnts)
+        except TypeError:
+            rospy.loginfo_throttle(1., "Lane2: no valid contour") # print every second
+            nb_valid_contours = 0
+        cv2.putText(debug_img, 'valid contours: {}'.format(nb_valid_contours), (20, 90), f, h, c, w)
         # we return a RGB image
         return cv2.cvtColor(debug_img, cv2.COLOR_BGR2RGB)
