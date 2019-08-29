@@ -55,7 +55,11 @@ class TimeCstLookahead:
     def __init__(self, _t=0.4): self.t = _t
     def set_dist(self, _d): pass
     def set_time(self, _t): self.t = _t
-    def get_dist(self, _v): return _v*self.t
+    def get_dist(self, _v):
+        d1 = _v*self.t
+        if d1 < 0.5: d1=0.5
+        if d1 > 0.9: d1=0.9
+        return d1
         
 class Guidance:
     mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
