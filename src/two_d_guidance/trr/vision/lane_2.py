@@ -61,7 +61,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             
         
     def draw_debug(self, cam, img_cam=None, border_color=128):
-        if self.img is None: return np.zeros((cam.h, cam.w, 3))
+        if self.img is None: return np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         if self.display_mode == Contour2Pipeline.show_input:
             debug_img = self.img
             cv2.rectangle(debug_img, tuple(self.tl), tuple(self.br), color=(0, 0, 255), thickness=3)
