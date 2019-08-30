@@ -8,6 +8,7 @@ import yaml
 import two_d_guidance.trr.utils as trr_u, smocap
 import pdb
 
+# fit an image to a new canvas (changes the size)
 def change_canvas(img_in, out_h, out_w, border_color=128):
     img_out = np.full((out_h, out_w, 3), border_color, dtype=np.uint8)
     in_h, in_w, _ = img_in.shape
@@ -17,6 +18,7 @@ def change_canvas(img_in, out_h, out_w, border_color=128):
     img_out[dy:dy+h, dx:dx+w] = cv2.resize(img_in, (w, h))
     return img_out
 
+# loads a camera - this calls smocap stuff - should probably go there too
 def load_cam_from_files(intr_path, extr_path, cam_name='cam1', alpha=1.):
     cam = smocap.Camera(0, 'cam1')
     cam.load_intrinsics(intr_path)
@@ -24,7 +26,7 @@ def load_cam_from_files(intr_path, extr_path, cam_name='cam1', alpha=1.):
     cam.load_extrinsics(extr_path)
     return cam
 
-# read an array of points - this is used for bireye calibration
+# read an array of points - this is used for birdeye calibration
 def read_point(yaml_data_path):
     with open(yaml_data_path, 'r') as stream:
         ref_data = yaml.load(stream)
@@ -49,6 +51,10 @@ class BirdEyeParam:
 
 class CarolineBirdEyeParam(BirdEyeParam):
     def __init__(self, x0=0.2, dx=1.2, dy=0.6, w=480):
+        BirdEyeParam.__init__(self, x0, dx, dy, w)
+
+class ChristineBirdEyeParam(BirdEyeParam):
+    def __init__(self, x0=0.3, dx=1.2, dy=0.6, w=480):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
         
