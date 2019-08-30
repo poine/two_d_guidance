@@ -201,6 +201,7 @@ class ContourFinder:
         self.img = None
         self.cnt_max = None
         self.cnt_max_area = 0
+        self.valid_cnts = None
 
     def has_contour(self): return (self.cnt_max is not None)
     def get_contour(self): return self.cnt_max
