@@ -66,9 +66,9 @@ class Node(trr_rpu.PeriodicNode):
                 self.publisher.publish_cmd(self.guidance.lin_sp, self.guidance.ang_sp)
             self.publisher.publish_status(self.guidance)
         except trr_rpu.NoRXMsgException:
-            rospy.loginfo_throttle(1., 'guidance: NoRXMsgException')
+            rospy.loginfo_throttle(1., 'guidance (lane or state_est): NoRXMsgException')
         except trr_rpu.RXMsgTimeoutException:
-            rospy.loginfo_throttle(1., 'guidance: RXMsgTimeoutException')
+            rospy.loginfo_throttle(1., 'guidance: (lane or state_est) RXMsgTimeoutException')
 
 
 def main(args):

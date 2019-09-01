@@ -22,8 +22,8 @@ import two_d_guidance.trr.vision.lane_3 as trr_l3
 import two_d_guidance.cfg.trr_vision_laneConfig
 
 class BirdEyePublisher(trr_rpu.ContourPublisher):
-    def __init__(self, frame_id, be, topic='trr_vision/lane/bird_eye'):
-        trr_rpu.ContourPublisher.__init__(self, frame_id, topic, be.param.va_bf, rgba=(1.,0.,0.,1.))
+    def __init__(self, frame_id, be_param, topic='trr_vision/lane/bird_eye'):
+        trr_rpu.ContourPublisher.__init__(self, frame_id, topic, be_param.va_bf, rgba=(1.,0.,0.,1.))
         
 '''
 
@@ -35,8 +35,12 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         pipe_classes = [trr_l1.Contour1Pipeline, trr_l2.Contour2Pipeline, trr_l3.Foo3Pipeline]
         trr_rpu.TrrSimpleVisionPipeNode.__init__(self, pipe_classes[pipe_type], self.pipe_cbk)
         try:
-            #self.pipeline.bird_eye.set_param(self.cam, trr_vu.CarolineBirdEyeParam())
-            self.pipeline.bird_eye.set_param(self.cam, trr_vu.ChristineBirdEyeParam())
+            robot_name = 'caroline'
+            param = trr_vu.NamedBirdEyeParam(robot_name)
+            #param = trr_vu.BirdEyeParam(x0=-0.3, dx=3., dy=3., w=480)
+            self.pipeline.bird_eye.set_param(param)
+            self.pipeline.bird_eye.compute_H(self.cam)
+>>>>>>> 79717f4b8d18127f89ba9443424d5c721cf22b16
         except AttributeError: rospy.loginfo("  pipeline has no bird eye")
         roi_y_min = rospy.get_param('~roi_y_min', 0)
         tl, br = (0, roi_y_min), (self.cam.w, self.cam.h)
@@ -46,18 +50,20 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         # Markers publishing
         self.cont_pub = trr_rpu.ContourPublisher(topic='/trr_vision/lane/detected_contour_markers', frame_id=self.ref_frame)
         self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, self.ref_frame, '/trr_vision/lane/fov')
-        try:
-            self.be_pub = BirdEyePublisher(self.ref_frame, self.pipeline.bird_eye, '/trr_vision/lane/bird_eye')
-        except AttributeError:
-            self.be_pub = None
-        self.lane_model_marker_pub = trr_rpu.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=self.ref_frame)
+        #try:
+        #    self.be_pub = BirdEyePublisher(self.ref_frame, self.pipeline.bird_eye.param, '/trr_vision/lane/bird_eye')
+        #except AttributeError:
+        #    self.be_pub = None
+        #self.lane_model_marker_pub = trr_rpu.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=self.ref_frame)
         # Model publishing
         self.lane_model_pub = trr_rpu.LaneModelPublisher('/trr_vision/lane/detected_model')
         self.lane_model = trru.LaneModel()
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_laneConfig, self.cfg_callback)
+        self.status_pub = trr_rpu.VisionLaneStatusPublisher('/trr/vision/lane/status')
         # start image subscription only here
         self.start()
 
+        
     def cfg_callback(self, config, level):
         rospy.loginfo("  Reconfigure Request:")
         try:
@@ -70,20 +76,20 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         if self.pipeline.lane_model.is_valid():
             self.lane_model_pub.publish(self.pipeline.lane_model)
             
-    def publish_3Dmarkers(self):
+    #def publish_3Dmarkers(self):
         #self.fov_pub.publish()
-        if self.be_pub is not None:
-            self.be_pub.publish()
-            if self.pipeline.bird_eye.cnt_fp is not None:
-                self.cont_pub.publish(self.pipeline.bird_eye.cnt_fp)
-        self.lane_model_marker_pub.publish(self.pipeline.lane_model)
+        #if self.be_pub is not None:
+            #self.be_pub.publish()
+            #if self.pipeline.bird_eye.cnt_fp is not None:
+            #    self.cont_pub.publish(self.pipeline.bird_eye.cnt_fp)
+        #self.lane_model_marker_pub.publish(self.pipeline.lane_model)
 
             
     def periodic(self):
-        if  self.pipeline.display_mode != self.pipeline.show_none:
+        if self.pipeline.display_mode != self.pipeline.show_none:
             self.img_pub.publish(self.pipeline, self.cam)
-            #self.publish_image()
-        self.publish_3Dmarkers()
+            #self.publish_3Dmarkers()
+        self.status_pub.publish(self.pipeline)
     
     def run(self):
         rate = rospy.Rate(self.low_freq)

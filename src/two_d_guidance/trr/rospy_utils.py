@@ -165,35 +165,43 @@ class TrrStateEstimationSubscriber(SimpleSubscriber):
 #
 # Lanes
 # 
-class LaneModelPublisher:
-    def __init__(self, topic):
-        rospy.loginfo(' publishing lane model on ({})'.format(topic))
-        self.pub = rospy.Publisher(topic, two_d_guidance.msg.LaneModel, queue_size=1)
+class LaneModelPublisher(SimplePublisher):
+    def __init__(self, topic, who='N/A'):
+        SimplePublisher.__init__(self, topic, two_d_guidance.msg.LaneModel, who)
 
     def publish(self, lm):
         msg = two_d_guidance.msg.LaneModel()
         msg.poly = lm.coefs
-        self.pub.publish(msg)
+        SimplePublisher.publish(self, msg)
 
         
-class LaneModelSubscriber:
-    def __init__(self, topic, cbk=None):
-        self.sub = rospy.Subscriber(topic, two_d_guidance.msg.LaneModel, self.msg_callback, queue_size=1)
-        rospy.loginfo(' subscribed to ({})'.format(topic))
-        self.msg = None
-        self.timeout = 0.5
-        
-    def msg_callback(self, msg):
-        self.msg = msg
-        self.last_msg_time = rospy.get_rostime()
+class LaneModelSubscriber(SimpleSubscriber):
+    def __init__(self, topic, what='', timeout=0.1, user_cbk=None):
+        SimpleSubscriber.__init__(self, topic, two_d_guidance.msg.LaneModel, what, timeout, user_cbk)
 
     def get(self, lm):
-        if self.msg is not None and (rospy.get_rostime()-self.last_msg_time).to_sec() < self.timeout:
-            lm.coefs = self.msg.poly
-            lm.set_valid(True)
-        else:
-            lm.set_valid(False)
+        msg = SimpleSubscriber.get(self) # raise exceptions
+        lm.coefs = self.msg.poly
+        lm.set_valid(True)
 
+
+#
+# Vision Status
+#
+class VisionLaneStatusPublisher(SimplePublisher):
+    def __init__(self, topic, who='N/A'):
+        SimplePublisher.__init__(self, topic, trr.msg.VisionLaneStatus, who)
+
+    def publish(self, pipe):
+        msg = trr.msg.VisionLaneStatus()
+        msg.fps = pipe.lp_fps
+        msg.cpu_t = pipe.lp_proc
+        msg.idle_t = pipe.idle_t
+        msg.skipped = pipe.skipped_frames
+        SimplePublisher.publish(self, msg)
+
+
+        
 #
 # Odometry
 #               
