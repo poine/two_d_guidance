@@ -281,7 +281,7 @@ class CompressedImgPublisher:
         msg.format = "jpeg"
         msg.data = np.array(cv2.imencode('.jpg', img_bgr)[1]).tostring()
         self.image_pub.publish(msg)
-
+        
         
 #
 # Markers
@@ -361,16 +361,16 @@ class TrrSimpleVisionPipeNode:
         self.low_freq = low_freq
         robot_name = rospy.get_param('~robot_name', '')
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
-        cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera_road_front')).split(',')
+        self.cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera_road_front')).split(',')
         self.ref_frame = rospy.get_param('~ref_frame', prefix(robot_name, 'base_link_footprint'))
 
-        self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(cam_names, fetch_extrinsics=True, world=self.ref_frame)
+        self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(self.cam_names, fetch_extrinsics=True, world=self.ref_frame)
         self.cam = self.cam_sys.cameras[0]; self.cam.set_undistortion_param(alpha=1.)
 
         self.pipeline = pipeline_class(self.cam)
 
-        #def start(self): # TODO FIXME - make sure this can be started later
-        self.cam_lst = smocap.rospy_utils.CamerasListener(cams=cam_names, cbk=self.on_image)
+    def start(self): # TODO FIXME - make sure this can be started later
+        self.cam_lst = smocap.rospy_utils.CamerasListener(cams=self.cam_names, cbk=self.on_image)
 
     # we get a bgr8 image as input
     def on_image(self, img_bgr, (cam_idx, stamp, seq)):
