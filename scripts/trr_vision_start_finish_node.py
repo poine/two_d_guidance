@@ -31,12 +31,18 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
 
     def __init__(self):
         trr_rpu.TrrSimpleVisionPipeNode.__init__(self, trr_vsf.StartFinishDetectPipeline, self.pipe_cbk)
-
         self.start_finish_pub = trr_rpu.TrrStartFinishPublisher()
         #self.img_pub = trr_rpu.ImgPublisher(self.cam, '/trr_vision/start_finish/image_debug')
         self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/start_finish/image_debug')
         self.marker_pub = MarkerPublisher(self.ref_frame)
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_start_finishConfig, self.cfg_callback)
+
+        roi_y_min = rospy.get_param('~roi_y_min', 0)
+        tl, br = (0, roi_y_min), (self.cam.w, self.cam.h)
+        self.pipeline.set_roi(tl, br) 
+
+        # start image subscription only here
+        self.start()
 
     def cfg_callback(self, cfg, level):
         rospy.loginfo("  Reconfigure Request:")

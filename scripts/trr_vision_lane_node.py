@@ -41,7 +41,10 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
             self.pipeline.bird_eye.set_param(param)
             self.pipeline.bird_eye.compute_H(self.cam)
         except AttributeError: rospy.loginfo("  pipeline has no bird eye")
-   
+        
+        roi_y_min = rospy.get_param('~roi_y_min', 0)
+        tl, br = (0, roi_y_min), (self.cam.w, self.cam.h)
+        self.pipeline.set_roi(tl, br) 
         # Image publishing
         self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/lane/image_debug')
         # Markers publishing
@@ -56,12 +59,11 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         self.lane_model_pub = trr_rpu.LaneModelPublisher('/trr_vision/lane/detected_model')
         self.lane_model = trru.LaneModel()
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_laneConfig, self.cfg_callback)
-
         self.status_pub = trr_rpu.VisionLaneStatusPublisher('/trr/vision/lane/status')
+        # start image subscription only here
+        self.start()
 
-        # TODO: start image subscription only here, after everything has been setup
-        #self.pipeline.start() TODO FIXME
-
+        
     def cfg_callback(self, config, level):
         rospy.loginfo("  Reconfigure Request:")
         try:

@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import two_d_guidance.trr.vision.utils as trr_vu
 import two_d_guidance.trr.utils as trr_u
-
+#import rospy # maybe not...
 import pdb
 
 class Contour2Pipeline(trr_vu.Pipeline):
@@ -19,6 +19,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.display_mode = Contour2Pipeline.show_none
         self.img = None
         self.cnt_max_be = None
+        self.use_single_contour = use_single_contour
 
     def set_roi(self, tl, br):
         print('roi: {} {}'.format(tl, br))
@@ -117,6 +118,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.contour_finder.draw(roi_img, draw_all=True)
         elif self.display_mode == Contour2Pipeline.show_be:
             debug_img = self._draw_be(cam)
+
         if self.display_mode not in [Contour2Pipeline.show_input, Contour2Pipeline.show_be] :
             debug_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.uint8)
             debug_img[self.roi] = roi_img
@@ -144,7 +146,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
                 debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, [self.cnt_max_be])
             else:
                 debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnts_be)
-                #debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, None)
         except AttributeError:
             debug_img = np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         return debug_img
+

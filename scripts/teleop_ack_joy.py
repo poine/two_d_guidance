@@ -19,7 +19,7 @@ class AckermannDriveJoyop:
 
     def __init__(self):
         cmd_topic = rospy.get_param('~cmd_topic', '/oscar_ackermann_controller/cmd_ack')
-        self.max_speed = 1.
+        self.max_speed = rospy.get_param('~max_speed', 1.)
         self.max_steering_angle = 0.5
         self.axis_speed = rospy.get_param('~axis_linear', 1)
         self.axis_steering = rospy.get_param('~axis_steering', 2)
