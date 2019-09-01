@@ -50,27 +50,40 @@ class BirdEyeParam:
         self.va_bf = np.array([(self.x0, self.dy/2, 0.), (self.x0+self.dx, self.dy/2, 0.), (self.x0+self.dx, -self.dy/2, 0.), (self.x0, -self.dy/2, 0.)])
 
 class CarolineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.2, dx=1.2, dy=0.6, w=480):
+    def __init__(self, x0=0.25, dx=1.2, dy=0.6, w=480): # real
+    #def __init__(self, x0=0.1, dx=2., dy=1., w=480):  # gazebo
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
     def __init__(self, x0=0.3, dx=1.2, dy=0.6, w=480):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
+def NamedBirdEyeParam(_name):
+    if    _name == 'caroline':  return CarolineBirdEyeParam()
+    elif  _name == 'christine': return ChristineBirdEyeParam()
+
         
 class BirdEyeTransformer:
     def __init__(self, cam, be_param):
-        self.set_param(cam, be_param)
+        self.set_param(be_param)
+        self.compute_H(cam)
         self.cnt_fp = None
         self.unwarped_img = None
         
-    def set_param(self, cam, be_param):
+    def set_param(self, be_param):
+        print('setting params x0 {} dx {} dy {}'.format(be_param.x0, be_param.dx, be_param.dy))
         self.param = be_param
         self.w, self.h = be_param.w, be_param.h
-        va_img = cam.project(be_param.va_bf)
-        self.va_img_undistorted = cam.undistort_points(va_img).astype(int).squeeze()
-        pts_src = self.va_img_undistorted
+
+    def compute_H(self, cam):
+        print('bird eye compute H')
+        va_img = cam.project(self.param.va_bf)
+        print('  viewing area img\n{}'.format(va_img.squeeze()))
+        self.va_img_undistorted = cam.undistort_points(va_img)
+        pts_src = self.va_img_undistorted.astype(int).squeeze()
+        print('  viewing area undist\n{}'.format(self.va_img_undistorted.squeeze()))
         pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
+        print('  be_dest\n{}'.format(pts_dst))
         self.H, status = cv2.findHomography(pts_src, pts_dst)
         print('calibrated bird eye: {} {}'.format(status, self.H))
         
@@ -78,7 +91,7 @@ class BirdEyeTransformer:
         pass
         
     def process(self, img):
-        self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h))
+        self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h), borderMode=cv2.BORDER_CONSTANT)
         return self.unwarped_img
 
     def draw_debug(self, cam, img=None, lane_model=None, cnts_be=None, border_color=128, fill_color=(255, 0, 255)):
@@ -92,11 +105,11 @@ class BirdEyeTransformer:
                 cv2.drawContours(img, cnt_be_int, -1, (255,0,255), 3)
                 cv2.fillPoly(img, pts =[cnt_be_int], color=fill_color)
         if lane_model is not None and lane_model.is_valid():
-            self.draw_line(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
+            self.draw_lane(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
         out_img = change_canvas(img, cam.h, cam.w)
         return out_img
 
-    def draw_line(self, cam, img, lane_model, l0=0.6, l1=1.8, color=(0,128,0)):
+    def draw_lane(self, cam, img, lane_model, l0=0.6, l1=1.8, color=(0,128,0)):
         # Coordinates in local_floor_plane(aka base_link_footprint) frame
         xs = np.linspace(l0, l1, 20); ys = lane_model.get_y(xs)
         pts_lfp = np.array([[x, y, 0] for x, y in zip(xs, ys)])
@@ -213,33 +226,38 @@ class ContourFinder:
     def get_contour_area(self): return self.cnt_max_area
     
     def process(self, img):
+        # detect contours
         self.img2, self.cnts, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
         self.cnt_max = None
         if self.cnts is not None and len(self.cnts) > 0:
+            # find contour with largest area
             self.cnt_max = max(self.cnts, key=cv2.contourArea)
             self.cnt_max_area = cv2.contourArea(self.cnt_max)
             if self.min_area is not None and self.cnt_max_area < self.min_area:
                self.cnt_max, self.cnt_max_area = None, 0
-            
+            # find all contours with a sufficient area
             if not self.single_contour:
                 self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
-                #self.cnt_areas_order = np.argsort(self.cnt_areas)
                 self.valid_cnts_idx = self.cnt_areas > self.min_area
                 self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
+                # sort by area ?
+                if False:
+                    self.valid_cnt_areas = self.cnt_areas[self.valid_cnts_idx]
+                    self.valib_cnt_areas_order = np.argsort(self.valid_cnt_areas)
+                    self.valid_cnt_sorted = self.valid_cnts[self.valib_cnt_areas_order]
                
-               
-    def draw(self, img, color=(255,0,0), thickness=3, fill=True, fill_color=(255,0,0), draw_all=False):
+    def draw(self, img, mc_border_color=(255,0,0), thickness=3, fill=True, mc_fill_color=(255,0,0), draw_all=False,
+             ac_fill_color=(0, 128, 128)):
         if self.cnt_max is not None:
             if fill:
                 try:
-                    cv2.fillPoly(img, pts =[self.cnt_max], color=fill_color)
+                    cv2.fillPoly(img, pts =[self.cnt_max], color=mc_fill_color)
                 except cv2.error: # fails when poly is too small?
                     #print self.cnt_max.shape
                     pass
-            cv2.drawContours(img, self.cnt_max, -1, color, thickness)
+            cv2.drawContours(img, self.cnt_max, -1, mc_border_color, thickness)
         if draw_all and self.valid_cnts is not None:
-            for c in self.valid_cnts:
-                cv2.fillPoly(img, pts =[c], color=(0, 128, 128))
+            for c in self.valid_cnts: cv2.fillPoly(img, pts =[c], color=ac_fill_color)
             
 
 class ColoredContourDetector:
@@ -433,16 +451,19 @@ class FloorPlaneInjector:
     def __init__(self):
         self.contour_floor_plane_blf = None
 
-    def compute(self, contour, cam):
+    def compute(self, contour_img, cam):
         # undistorted coordinates
-        contour_undistorted = cv2.undistortPoints(contour.astype(np.float32), cam.K, cam.D, None, cam.K)
+        contour_undistorted = cv2.undistortPoints(contour_img.astype(np.float32), cam.K, cam.D, None, cam.K)
         # contour in optical plan
-        contour_cam = [np.dot(cam.invK, [u, v, 1]) for (u, v) in contour_undistorted.squeeze()]
-        # contour projected on floor plane (in cam frame)
-        contour_floor_plane_cam = get_points_on_plane(contour_cam, cam.fp_n, cam.fp_d)
+        contour_camo = [np.dot(cam.invK, [u, v, 1]) for (u, v) in contour_undistorted.squeeze()]
+        # contour projected on floor plane (in cam0 frame)
+        contour_floor_plane_camo = get_points_on_plane(contour_camo, cam.fp_n, cam.fp_d)
         # contour projected on floor plane (in body frame)
-        self.contour_floor_plane_blf = np.array([np.dot(cam.cam_to_world_T[:3], p.tolist()+[1]) for p in contour_floor_plane_cam])
+        self.contour_floor_plane_blf = np.array([np.dot(cam.cam_to_world_T[:3], p.tolist()+[1]) for p in contour_floor_plane_camo])
 
+        return self.contour_floor_plane_blf
+
+        
 # Timing of pipelines
 class Pipeline:
     def __init__(self):
@@ -476,6 +497,7 @@ class Pipeline:
         self.min_proc = np.min([self.min_proc, self.last_processing_duration])
         self.max_proc = np.max([self.max_proc, self.last_processing_duration])
         self.lp_proc = self.k_lp*self.lp_proc+(1-self.k_lp)*self.last_processing_duration
+        self.idle_t = 1./self.lp_fps - self.lp_proc
 
     def draw_timing(self, img, x0=280, y0=20, dy=35, h=0.75, color_bgr=(220, 220, 50)):
         f, c, w = cv2.FONT_HERSHEY_SIMPLEX, color_bgr, 2

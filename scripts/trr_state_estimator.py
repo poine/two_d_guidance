@@ -62,7 +62,14 @@ class Node:
     def periodic(self):
         self.state_est_pub.publish(self.estimator)
 
-        self.lane_model_sub.get(self.lane_model)
+        try:
+            self.lane_model_sub.get(self.lane_model)
+        except trr_rpu.NoRXMsgException:
+            self.lane_model.set_valid(False)
+            rospy.loginfo_throttle(1., 'trr_state_estimation lane_model: NoRXMsgException')
+        except trr_rpu.RXMsgTimeoutException:
+            self.lane_model.set_valid(False)
+            rospy.loginfo_throttle(1., 'trr_state_estimation lane_model: RXMsgTimeoutException')
 
 
     def run(self, periodic_freq=50.):

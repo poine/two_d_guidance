@@ -11,6 +11,19 @@ import two_d_guidance.msg
 
 def norm_mpi_pi(v): return ( v + np.pi) % (2 * np.pi ) - np.pi
 
+def find_extends(cnt):
+    xmin, xmax = np.min(cnt[:,0]), np.max(cnt[:,0])
+    ymin, ymax = np.min(cnt[:,1]), np.max(cnt[:,1])
+    return xmin, xmax, ymin, ymax
+
+def print_extends(cnt, txt, full=False):
+    xmin, xmax, ymin, ymax = find_extends(cnt)
+    if not full:
+        print('  {}:    x {:.2f} {:.2f} y {:.2f} {:.2f}'.format(txt, xmin, xmax, ymin, ymax))
+    else:
+        print('  {}: len {} x {:.2f} {:.2f} y {:.2f} {:.2f}'.format(txt, len(cnt), xmin, xmax, ymin, ymax))
+
+
 #
 # This is a specialized version of a path including a velocity profile
 #
@@ -49,16 +62,17 @@ class LaneModel:
         return np.polyval(self.coefs, x)
 
     def fit(self, pts, order=3):
-        self.coefs = np.polyfit(pts[:,0], pts[:,1], order)
-        self.x_min, self.x_max = np.min(pts[:,0]), np.max(pts[:,0])
+        xs, ys = pts[:,0], pts[:,1]
+        self.coefs = np.polyfit(xs, ys, order)
+        self.x_min, self.x_max = np.min(xs), np.max(xs)
     
-    def draw_on_cam_img(self, img, cam, l0=0.1, l1=0.7):
+    def draw_on_cam_img(self, img, cam, l0=0.1, l1=0.7, color=(0,128,0)):
         xs = np.linspace(l0, l1, 20); ys = self.get_y(xs)
         pts_world = np.array([[x, y, 0] for x, y in zip(xs, ys)])
         pts_img = cam.project(pts_world)
         for i in range(len(pts_img)-1):
             try:
-                cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), (0,128,0), 4)
+                cv2.line(img, tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)), color, 4)
             except OverflowError:
                 pass
 
