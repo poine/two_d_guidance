@@ -475,6 +475,7 @@ class Pipeline:
         self.min_fps, self.max_fps, self.lp_fps = np.inf, 0, 0.1
         self.last_processing_duration = None
         self.min_proc, self.max_proc, self.lp_proc = np.inf, 0, 1e-6
+        self.idle_t = 0.
         self.k_lp = 0.9 # low pass coefficient
         
     def process_image(self, img, cam, stamp, seq):
