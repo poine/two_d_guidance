@@ -139,7 +139,6 @@ class Contour2Pipeline(trr_vu.Pipeline):
         cv2.putText(debug_img, 'model: {} valid'.format('' if self.lane_model.is_valid() else 'not'), (20, 90+dy), f, h1, c1, w)
         # we return a BGR image
         return debug_img
->>>>>>> 79717f4b8d18127f89ba9443424d5c721cf22b16
 
     def _draw_be(self, cam):
         try:

@@ -40,8 +40,8 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
             #param = trr_vu.BirdEyeParam(x0=-0.3, dx=3., dy=3., w=480)
             self.pipeline.bird_eye.set_param(param)
             self.pipeline.bird_eye.compute_H(self.cam)
->>>>>>> 79717f4b8d18127f89ba9443424d5c721cf22b16
         except AttributeError: rospy.loginfo("  pipeline has no bird eye")
+        
         roi_y_min = rospy.get_param('~roi_y_min', 0)
         tl, br = (0, roi_y_min), (self.cam.w, self.cam.h)
         self.pipeline.set_roi(tl, br) 
