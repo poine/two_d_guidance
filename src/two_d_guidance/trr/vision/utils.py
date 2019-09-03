@@ -55,14 +55,19 @@ class CarolineBirdEyeParam(BirdEyeParam):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.35, dx=1.2, dy=0.6, w=480):
+    def __init__(self, x0=0.40, dx=1.5, dy=0.45, w=480):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 def NamedBirdEyeParam(_name):
     if    _name == 'caroline':  return CarolineBirdEyeParam()
     elif  _name == 'christine': return ChristineBirdEyeParam()
 
-        
+# def make_2d_line(p0, p1, spacing=200, endpoint=True):
+#     dist = np.linalg.norm(p1-p0)
+#     n_pt = dist/spacing
+#     if endpoint: n_pt += 1
+#     return np.stack([np.linspace(p0[j], p1[j], n_pt, endpoint=endpoint) for j in range(2)], axis=-1)
+
 class BirdEyeTransformer:
     def __init__(self, cam, be_param):
         self.set_param(be_param)
@@ -75,21 +80,46 @@ class BirdEyeTransformer:
         self.param = be_param
         self.w, self.h = be_param.w, be_param.h
 
-    def compute_H(self, cam):
-        print('bird eye compute H')
-        va_img = cam.project(self.param.va_bf)
-        print('  viewing area img\n{}'.format(va_img.squeeze()))
-        self.va_img_undistorted = cam.undistort_points(va_img)
-        pts_src = self.va_img_undistorted.astype(int).squeeze()
-        print('  viewing area undist\n{}'.format(self.va_img_undistorted.squeeze()))
-        pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
-        print('  be_dest\n{}'.format(pts_dst))
-        self.H, status = cv2.findHomography(pts_src, pts_dst)
-        print('calibrated bird eye: {} {}'.format(status, self.H))
-        
+    def compute_H(self, cam, load=False):
+        if not load:
+            ''' fails is I use be points that are outside of cam frustum '''
+            print('bird eye compute H')
+            self.va_img = cam.project(self.param.va_bf)
+            print('w {} h {}'.format(self.w, self.h))
+            for pt_img in self.va_img.squeeze():
+                if (pt_img[0] < 0 or pt_img[0] > self.h) or (pt_img[1] < 0 or pt_img[1] > self.w):
+                    print '###### Fail {}'.format(pt_img)
+            print('  viewing area img\n{}'.format(self.va_img.squeeze()))
+            self.va_img_undistorted = cam.undistort_points(self.va_img)
+            pts_src = self.va_img_undistorted.astype(int).squeeze()
+            print('  viewing area undist\n{}'.format(self.va_img_undistorted.squeeze()))
+            pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
+            print('  be_dest\n{}'.format(pts_dst))
+            self.H, status = cv2.findHomography(pts_src, pts_dst)
+            print('calibrated bird eye: ({})\n{}'.format(status.squeeze(), self.H))
+            np.savez('/tmp/foo', H=self.H)
+        else:
+            data =  np.load('/tmp/foo')
+            self.H = data['H']
+                 
     def plot_calibration(self, img_undistorted):
         pass
         
+    def points_imp_to_be(self, points_imp):
+        return cv2.perspectiveTransform(points_imp, self.H)
+
+    def unwarped_to_fp(self, cam, cnt_uw):
+        #pdb.set_trace()
+        s = self.param.dy/self.param.w
+        self.cnt_fp = np.array([((self.param.h-p[1])*s+self.param.x0, (self.param.w/2-p[0])*s, 0.) for p in cnt_uw.squeeze()])
+        return self.cnt_fp
+
+    def lfp_to_unwarped(self, cam, cnt_lfp):
+        s = self.param.dy/self.param.w
+        cnt_uv = np.array([(self.param.w/2-y/s, self.param.h-(x-self.param.x0)/s) for x, y, _ in cnt_lfp])
+        return cnt_uv
+
+
     def process(self, img):
         self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h), borderMode=cv2.BORDER_CONSTANT)
         return self.unwarped_img
@@ -123,19 +153,6 @@ class BirdEyeTransformer:
                 pass
 
 
-    def points_imp_to_be(self, points_imp):
-        return cv2.perspectiveTransform(points_imp, self.H)
-
-    def unwarped_to_fp(self, cam, cnt_uw):
-        #pdb.set_trace()
-        s = self.param.dy/self.param.w
-        self.cnt_fp = np.array([((self.param.h-p[1])*s+self.param.x0, (self.param.w/2-p[0])*s, 0.) for p in cnt_uw.squeeze()])
-        return self.cnt_fp
-
-    def lfp_to_unwarped(self, cam, cnt_lfp):
-        s = self.param.dy/self.param.w
-        cnt_uv = np.array([(self.param.w/2-y/s, self.param.h-(x-self.param.x0)/s) for x, y, _ in cnt_lfp])
-        return cnt_uv
 
 
 
