@@ -55,23 +55,24 @@ class CarolineBirdEyeParam(BirdEyeParam):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.40, dx=1.5, dy=0.45, w=480):
+    def __init__(self, x0=0.40, dx=1.5, dy=0.75, w=480):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 def NamedBirdEyeParam(_name):
     if    _name == 'caroline':  return CarolineBirdEyeParam()
     elif  _name == 'christine': return ChristineBirdEyeParam()
 
-# def make_2d_line(p0, p1, spacing=200, endpoint=True):
-#     dist = np.linalg.norm(p1-p0)
-#     n_pt = dist/spacing
-#     if endpoint: n_pt += 1
-#     return np.stack([np.linspace(p0[j], p1[j], n_pt, endpoint=endpoint) for j in range(2)], axis=-1)
+def make_3d_line(p0, p1, spacing=200, endpoint=True):
+    dist = np.linalg.norm(p1-p0)
+    n_pt = dist/spacing
+    if endpoint: n_pt += 1
+    return np.stack([np.linspace(p0[j], p1[j], n_pt, endpoint=endpoint) for j in range(3)], axis=-1)
 
 class BirdEyeTransformer:
     def __init__(self, cam, be_param):
         self.set_param(be_param)
         self.compute_H(cam)
+        self.compute_H2(cam)
         self.cnt_fp = None
         self.unwarped_img = None
         
@@ -80,28 +81,42 @@ class BirdEyeTransformer:
         self.param = be_param
         self.w, self.h = be_param.w, be_param.h
 
-    def compute_H(self, cam, load=False):
-        if not load:
-            ''' fails is I use be points that are outside of cam frustum '''
-            print('bird eye compute H')
-            self.va_img = cam.project(self.param.va_bf)
-            print('w {} h {}'.format(self.w, self.h))
-            for pt_img in self.va_img.squeeze():
-                if (pt_img[0] < 0 or pt_img[0] > self.h) or (pt_img[1] < 0 or pt_img[1] > self.w):
-                    print '###### Fail {}'.format(pt_img)
-            print('  viewing area img\n{}'.format(self.va_img.squeeze()))
-            self.va_img_undistorted = cam.undistort_points(self.va_img)
-            pts_src = self.va_img_undistorted.astype(int).squeeze()
-            print('  viewing area undist\n{}'.format(self.va_img_undistorted.squeeze()))
-            pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
-            print('  be_dest\n{}'.format(pts_dst))
-            self.H, status = cv2.findHomography(pts_src, pts_dst)
-            print('calibrated bird eye: ({})\n{}'.format(status.squeeze(), self.H))
-            np.savez('/tmp/foo', H=self.H)
+    # compute Homography from image plan to be image
+    def compute_H(self, cam):
+        ''' fails is I use be points that are outside of cam frustum '''
+        print('bird eye compute H')
+        self.va_img = cam.project(self.param.va_bf)
+        print('w {} h {}'.format(self.w, self.h))
+        for pt_img in self.va_img.squeeze():
+            if (pt_img[0] < 0 or pt_img[0] > self.h) or (pt_img[1] < 0 or pt_img[1] > self.w):
+                print '###### Fail {}'.format(pt_img)
+        print('  viewing area img\n{}'.format(self.va_img.squeeze()))
+        self.va_img_undistorted = cam.undistort_points(self.va_img)
+        pts_src = self.va_img_undistorted.squeeze()
+        print('  viewing area undist\n{}'.format(self.va_img_undistorted.squeeze()))
+        pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
+        print('  be_dest\n{}'.format(pts_dst))
+        self.H, status = cv2.findHomography(pts_src, pts_dst)
+        print('calibrated bird eye be: ({})\n{}'.format(status.squeeze(), self.H))
+
+    # compute Homography from image plan to base link footprint
+    def compute_H2(self, cam):
+        if 1:
+            va_vert_blf = self.param.va_bf
+            va_lines_blf = np.concatenate([make_3d_line(va_vert_blf[i-1], va_vert_blf[i], spacing=0.01, endpoint=False) for i in range(len(va_vert_blf))])
+            va_lines_img = cam.project(va_lines_blf)
+            va_valid_idx = np.logical_and(va_lines_img[:,0,0] > 0, va_lines_img[:,0,0] < cam.w)
+            va_lines_imp = cam.undistort_points(va_lines_img[va_valid_idx])
+            self.H2, status = cv2.findHomography(va_lines_imp, va_lines_blf[va_valid_idx], cv2.RANSAC, 0.00001)
         else:
-            data =  np.load('/tmp/foo')
-            self.H = data['H']
-                 
+            #pdb.set_trace()
+            self.va_img = cam.project(self.param.va_bf)
+            self.va_img_undistorted = cam.undistort_points(self.va_img)
+            pts_src = self.va_img_undistorted.squeeze()
+            pts_dst = self.param.va_bf
+            self.H2, status = cv2.findHomography(pts_src, pts_dst)
+        print('calibrated bird eye blf: ({})\n{}'.format(status.squeeze(), self.H2))
+        
     def plot_calibration(self, img_undistorted):
         pass
         
@@ -119,6 +134,9 @@ class BirdEyeTransformer:
         cnt_uv = np.array([(self.param.w/2-y/s, self.param.h-(x-self.param.x0)/s) for x, y, _ in cnt_lfp])
         return cnt_uv
 
+    def points_imp_to_blf(self, points_imp):
+        return cv2.perspectiveTransform(points_imp, self.H2)
+    
 
     def process(self, img):
         self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h), borderMode=cv2.BORDER_CONSTANT)
@@ -471,10 +489,11 @@ class FloorPlaneInjector:
 
     def compute(self, contour_img, cam):
         # undistorted coordinates
-        contour_undistorted = cv2.undistortPoints(contour_img.astype(np.float32), cam.K, cam.D, None, cam.K)
+        #contour_undistorted = cv2.undistortPoints(contour_img.astype(np.float32), cam.K, cam.D, None, cam.undist_K)
+        contour_undistorted = cam.undistort_points(contour_img.astype(np.float32))
         # contour in optical plan
-        contour_camo = [np.dot(cam.invK, [u, v, 1]) for (u, v) in contour_undistorted.squeeze()]
-        # contour projected on floor plane (in cam0 frame)
+        contour_camo = [np.dot(cam.inv_undist_K, [u, v, 1]) for (u, v) in contour_undistorted.squeeze()]
+        # contour projected on floor plane (in camo frame)
         contour_floor_plane_camo = get_points_on_plane(contour_camo, cam.fp_n, cam.fp_d)
         # contour projected on floor plane (in body frame)
         self.contour_floor_plane_blf = np.array([np.dot(cam.cam_to_world_T[:3], p.tolist()+[1]) for p in contour_floor_plane_camo])

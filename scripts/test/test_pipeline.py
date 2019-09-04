@@ -4,44 +4,48 @@ import rosbag, cv_bridge
 import pdb
 
 import smocap
-import two_d_guidance.trr_vision_utils as trr_vu
+import two_d_guidance.trr.vision.utils  as trr_vu
 import two_d_guidance.trr.vision.lane_1 as trr_l1
 import two_d_guidance.trr.vision.lane_2 as trr_l2
+import two_d_guidance.trr.vision.lane_3 as trr_l3
 
 def test_on_img(pipe, cam, img):
-    pipe.process_image(img, cam)
+    pipe.process_image(img, cam, None, None)
     out_img = pipe.draw_debug(cam)
     cv2.imshow('in', img); cv2.imshow('out', out_img)
     cv2.waitKey(0)
 
 
-def test_on_bag(pipe, cam, bag_path, img_topic='/camera1/image_raw' ):
+def test_on_bag(pipe, cam, bag_path, img_topic='/camera1/image_raw', sleep=False, talk=False ):
     bag, bridge = rosbag.Bag(bag_path, "r"), cv_bridge.CvBridge()
-    durations = []
-    for topic, msg, t in bag.read_messages(topics=[img_topic]):
+    durations, last_img_t = [], None
+    for topic, msg, img_t in bag.read_messages(topics=[img_topic]):
+        img_dt = 0.01 if last_img_t is None else (img_t-last_img_t).to_sec()
+        # this has been settled - we consume bgr image ( same as opencv )
         #cv_img = bridge.imgmsg_to_cv2(msg, "rgb8")
         cv_img = bridge.imgmsg_to_cv2(msg, "bgr8")
-        #print cv_img.dtype
-        #if cv_img.dtype == np.uint8:
-        #    cv_img = cv_img.astype(np.float32)/255.
         pipe.process_image(cv_img, cam, msg.header.stamp, msg.header.seq)
         durations.append(pipe.last_processing_duration)
-        print('{:.3f}s ({:.1f}hz)'.format(pipe.last_processing_duration, 1./pipe.last_processing_duration ))
-        out_img = pipe.draw_debug(cam)
+        if talk: print('{:.3f}s ({:.1f}hz)'.format(pipe.last_processing_duration, 1./pipe.last_processing_duration ))
+        out_img = pipe.draw_debug_bgr(cam)
         cv2.imshow('out', out_img)
         cv2.waitKey(10)
+        last_img_t = img_t
+        time_to_sleep = max(0., img_dt-pipe.last_processing_duration) if sleep else 0
+        time.sleep(time_to_sleep)
+        
     freqs = 1./np.array(durations); _mean, _std, _min, _max = np.mean(freqs), np.std(freqs), np.min(freqs), np.max(freqs)
     plt.hist(freqs); plt.xlabel('hz'); plt.legend(['mean {:.1f} std {:.1f}\n min {:.1f} max {:.1f}'.format(_mean, _std, _min, _max)])
     plt.show()
     
 if __name__ == '__main__':
-    robot_pierrette, robot_caroline = range(2)
+    robot_pierrette, robot_caroline, robot_christine = range(3)
     robot = robot_caroline
     if robot == robot_pierrette:
         intr_cam_calib_path = '/home/poine/.ros/camera_info/ueye_drone.yaml'
         extr_cam_calib_path = '/home/poine/work/roverboard/roverboard_description/cfg/pierrette_cam1_extr.yaml'
     elif robot == robot_caroline:
-        intr_cam_calib_path = '/home/poine/.ros/camera_info/camera_road_front.yaml'
+        intr_cam_calib_path = '/home/poine/.ros/camera_info/caroline_camera_road_front.yaml'
         extr_cam_calib_path = '/home/poine/work/roverboard/roverboard_description/cfg/caroline_cam_road_front_extr.yaml'
     cam = trr_vu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
 
@@ -49,16 +53,17 @@ if __name__ == '__main__':
     pipe_type = pipe_2
     if pipe_type == pipe_1:    # 154hz
         pipe = trr_l1.Contour1Pipeline(cam)
-        pipe.thresholder.set_threshold(110)
-        pipe.display_mode = trr_l1.Contour2Pipeline.show_be
+        pipe.thresholder.set_threshold(150)
+        pipe.display_mode = pipe.show_contour
     elif pipe_type == pipe_2:  # now 200hz
-        pipe = trr_l2.Contour2Pipeline(cam, trr_vu.CarolineBirdEyeParam());
-        pipe.thresholder.set_threshold(110)
-        pipe.display_mode = trr_l2.Contour2Pipeline.show_contour
-        #pipe.set_roi((0, 0),(cam.w, cam.h))
-        pipe.set_roi((0, 130),(cam.w, cam.h))
+        pipe = trr_l2.Contour2Pipeline(cam, trr_vu.CarolineBirdEyeParam(), use_single_contour=False, ctr_img_min_area=200); # 500
+        pipe.thresholder.set_threshold(160)
+        pipe.display_mode = trr_l2.Contour2Pipeline.show_be
+        pipe.set_roi((0, 0),(cam.w, cam.h))
     elif pipe_type == pipe_3:
-        pipe = trr_vu.Foo3Pipeline(cam, trr_vu.CarolineBirdEyeParam())
+        pipe = trr_l3.Foo3Pipeline(cam, trr_vu.CarolineBirdEyeParam())
+        #pipe.thresholder.set_threshold(160)
+        pipe.display_mode = pipe.show_input
     mode_img, mode_bag = range(2)
     mode = mode_bag
     if mode == mode_img:
@@ -66,7 +71,8 @@ if __name__ == '__main__':
         img_path = '/home/poine/work/robot_data/caroline/line_z_02.png'
         test_on_img(pipe, cam, cv2.imread(img_path, cv2.IMREAD_COLOR))
     elif mode == mode_bag:
-        bag_path = '/home/poine/2019-07-08-16-37-38.bag' # pierrette
-        bag_path = '/home/poine/2019-07-15-19-01-30.bag'#'/home/poine/2019-07-11-18-08-11.bag' #2019-07-11-15-03-18.bag' # caroline
+        #bag_path = '/home/poine/2019-07-08-16-37-38.bag' # pierrette
+        #bag_path = '/home/poine/2019-07-15-19-01-30.bag'#'/home/poine/2019-07-11-18-08-11.bag' #2019-07-11-15-03-18.bag' # caroline
+        bag_path = '/home/poine/2019-08-30-12-04-21.bag' # caroline vedrines #2019-08-08-16-46-55.bag'
         img_topic = '/camera_road_front/image_raw'
         test_on_bag(pipe, cam, bag_path, img_topic)

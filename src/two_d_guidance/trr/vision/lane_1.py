@@ -4,7 +4,7 @@ import two_d_guidance.trr.vision.utils as trr_vu
 import two_d_guidance.trr.utils as trru
 
 import pdb
-
+# TODO: use multiple contours rather than larger one?
 class Contour1Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam):
@@ -16,6 +16,12 @@ class Contour1Pipeline(trr_vu.Pipeline):
         self.lane_model = trru.LaneModel()
         self.display_mode = Contour1Pipeline.show_contour
         self.img = None
+
+    def set_roi(self, tl, br):
+        print('roi: {} {}'.format(tl, br))
+        self.tl, self.br = tl, br
+        self.roi_h, self.roi_w = self.br[1]-self.tl[1], self.br[0]-self.tl[0]
+        self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
         
     def _process_image(self, img, cam):
         self.img = img
@@ -53,8 +59,8 @@ class Contour1Pipeline(trr_vu.Pipeline):
         self.draw_timing(debug_img)
         
         if self.lane_model.is_valid() and self.display_mode not in [Contour1Pipeline.show_be]:
-            #x_min, x_max = self.lane_model.x_min, self.lane_model.x_max
-            x_min, x_max = 0.15, 12.
+            x_min, x_max = self.lane_model.x_min, self.lane_model.x_max
+            #x_min, x_max = 0.15, 12.
             self.lane_model.draw_on_cam_img(debug_img, cam, l0=x_min, l1=x_max, color=(128, 128, 0))
         return debug_img
             
