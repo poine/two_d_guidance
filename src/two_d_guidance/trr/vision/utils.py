@@ -50,8 +50,8 @@ class BirdEyeParam:
         self.va_bf = np.array([(self.x0, self.dy/2, 0.), (self.x0+self.dx, self.dy/2, 0.), (self.x0+self.dx, -self.dy/2, 0.), (self.x0, -self.dy/2, 0.)])
 
 class CarolineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.25, dx=1.2, dy=0.6, w=480): # real
-    #def __init__(self, x0=0.1, dx=2., dy=1., w=480):  # gazebo
+    #def __init__(self, x0=0.25, dx=1.2, dy=0.6, w=480): # real
+    def __init__(self, x0=0.1, dx=2., dy=1.5, w=480):  # gazebo
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
