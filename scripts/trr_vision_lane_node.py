@@ -12,12 +12,9 @@ import two_d_guidance.trr.utils as trru
 import two_d_guidance.trr.vision.utils as trr_vu
 import two_d_guidance.trr.rospy_utils as trr_rpu
 # Different versions
-# Contour detection in thresholded gray camera image
-import two_d_guidance.trr.vision.lane_1 as trr_l1
-# Contour detection in thresholded gray camera image with bird eye
-import two_d_guidance.trr.vision.lane_2 as trr_l2
-# In progress
-import two_d_guidance.trr.vision.lane_3 as trr_l3
+import two_d_guidance.trr.vision.lane_1 as trr_l1 # Contour detection in thresholded gray camera image
+import two_d_guidance.trr.vision.lane_2 as trr_l2 # Contour detection in thresholded gray camera image with bird eye
+import two_d_guidance.trr.vision.lane_3 as trr_l3 # In progress
 
 import two_d_guidance.cfg.trr_vision_laneConfig
 
@@ -35,11 +32,13 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         pipe_classes = [trr_l1.Contour1Pipeline, trr_l2.Contour2Pipeline, trr_l3.Foo3Pipeline]
         trr_rpu.TrrSimpleVisionPipeNode.__init__(self, pipe_classes[pipe_type], self.pipe_cbk)
         try:
-            robot_name = 'caroline'
+            robot_name = rospy.get_param('~robot_name', 'christine')#'caroline'
             param = trr_vu.NamedBirdEyeParam(robot_name)
+            rospy.loginfo("  using {} bird eye".format(robot_name))
             #param = trr_vu.BirdEyeParam(x0=-0.3, dx=3., dy=3., w=480)
             self.pipeline.bird_eye.set_param(param)
             self.pipeline.bird_eye.compute_H(self.cam)
+            self.pipeline.bird_eye.compute_H2(self.cam)
         except AttributeError: rospy.loginfo("  pipeline has no bird eye")
         
         roi_y_min = rospy.get_param('~roi_y_min', 0)
@@ -48,18 +47,18 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         # Image publishing
         self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/lane/image_debug')
         # Markers publishing
-        self.cont_pub = trr_rpu.ContourPublisher(topic='/trr_vision/lane/detected_contour_markers', frame_id=self.ref_frame)
-        self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, self.ref_frame, '/trr_vision/lane/fov')
+        #self.cont_pub = trr_rpu.ContourPublisher(topic='/trr_vision/lane/detected_contour_markers', frame_id=self.ref_frame)
+        #self.fov_pub = smocap.rospy_utils.FOVPublisher(self.cam_sys, self.ref_frame, '/trr_vision/lane/fov')
         #try:
         #    self.be_pub = BirdEyePublisher(self.ref_frame, self.pipeline.bird_eye.param, '/trr_vision/lane/bird_eye')
         #except AttributeError:
         #    self.be_pub = None
         #self.lane_model_marker_pub = trr_rpu.LaneModelMarkerPublisher('/trr_vision/lane/detected_model_markers', ref_frame=self.ref_frame)
         # Model publishing
-        self.lane_model_pub = trr_rpu.LaneModelPublisher('/trr_vision/lane/detected_model')
+        self.lane_model_pub = trr_rpu.LaneModelPublisher('/trr_vision/lane/detected_model', who='trr_vision_lane_node')
         self.lane_model = trru.LaneModel()
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_laneConfig, self.cfg_callback)
-        self.status_pub = trr_rpu.VisionLaneStatusPublisher('/trr/vision/lane/status')
+        self.status_pub = trr_rpu.VisionLaneStatusPublisher('/trr/vision/lane/status', who='trr_vision_lane_node')
         # start image subscription only here
         self.start()
 

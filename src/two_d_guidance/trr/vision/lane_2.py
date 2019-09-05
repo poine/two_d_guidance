@@ -60,7 +60,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         # else: #  all
         if len(self.cnts_lfp) > 0:
             sum_ctr_lfp = np.concatenate(self.cnts_lfp, axis=0)
-            self.lane_model.fit(sum_ctr_lfp[:,:2])
+            self.lane_model.fit(sum_ctr_lfp.squeeze())
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
@@ -69,38 +69,47 @@ class Contour2Pipeline(trr_vu.Pipeline):
             
     def _compute_contours_lfp(self, cam):
         self.cnts_be, self.cnts_lfp = [], []
-        for i, c in enumerate(self.contour_finder.valid_cnts):
-            #print('ctr {}'.format(i))
-            # Compute contour vertices in optical plan (undistort)
-            cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
-            #trr_u.print_extends(cnt_imp.squeeze(), ' undis')
-            # Compute contour vertices in bird eye coordinates
-            cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
-            #trr_u.print_extends(cnt_be.squeeze(),  ' be   ', full=True)
-            # Filter out points that are outside bird eye area
-            cnt_be1 = []
-            #print('  shape undist {}'.format(cnt_be.shape))
-            for p in cnt_be.squeeze():
-                if p[0] >= 0 and p[0] < self.bird_eye.w and p[1]>=0 and p[1]<self.bird_eye.h:
-                    cnt_be1.append(p)
-            cnt_be1 = np.array(cnt_be1).reshape(-1, 1, 2)
-            #print('  shape undist2 {}'.format(cnt_be1.shape))
-            min_vertices = 5
-            if cnt_be1.shape[0] > min_vertices: # we have not removed all the contour
-                #trr_u.print_extends(cnt_be1.squeeze(),  ' be1   ')
-                self.cnts_be.append(cnt_be1)
-                try:
-                    cnt_lfp = self.bird_eye.unwarped_to_fp(cam, cnt_be1)
-                except IndexError:
-                    pdb.set_trace()
-                #trr_u.print_extends(cnt_lfp.squeeze(),  ' lfp   ')
-                self.cnts_lfp.append(cnt_lfp)
-            #else:
-            #    self.cnts_be.append(c_be1)  # empty to keep sorting happy
-            #    self.cnts_lfp.append(c_be1)
-        self.cnts_lfp = np.array(self.cnts_lfp)
+        if self.contour_finder.valid_cnts is None: return
 
-    
+        if 0:
+            for i, c in enumerate(self.contour_finder.valid_cnts):
+                #print('ctr {}'.format(i))
+                # Compute contour vertices in optical plan (undistort)
+                cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
+                #trr_u.print_extends(cnt_imp.squeeze(), ' undis')
+                # Compute contour vertices in bird eye coordinates
+                cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
+                #trr_u.print_extends(cnt_be.squeeze(),  ' be   ', full=True)
+                # Filter out points that are outside bird eye area
+                cnt_be1 = []
+                #print('  shape undist {}'.format(cnt_be.shape))
+                for p in cnt_be.squeeze():
+                    if p[0] >= 0 and p[0] < self.bird_eye.w and p[1]>=0 and p[1]<self.bird_eye.h:
+                        cnt_be1.append(p)
+                cnt_be1 = np.array(cnt_be1).reshape(-1, 1, 2)
+                #print('  shape undist2 {}'.format(cnt_be1.shape))
+                min_vertices = 5
+                if cnt_be1.shape[0] > min_vertices: # we have not removed all the contour
+                    #trr_u.print_extends(cnt_be1.squeeze(),  ' be1   ')
+                    self.cnts_be.append(cnt_be1)
+                    try:
+                        cnt_lfp = self.bird_eye.unwarped_to_fp(cam, cnt_be1)
+                    except IndexError:
+                        pdb.set_trace()
+                        #trr_u.print_extends(cnt_lfp.squeeze(),  ' lfp   ')
+                        self.cnts_lfp.append(cnt_lfp)
+                #else:
+                #    self.cnts_be.append(c_be1)  # empty to keep sorting happy
+                #    self.cnts_lfp.append(c_be1)
+                
+        
+        for i, c in enumerate(self.contour_finder.valid_cnts):
+            cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
+            #cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
+            #self.cnts_be.append(cnt_be)
+            cnt_lfp = self.bird_eye.points_imp_to_blf(cnt_imp)
+            self.cnts_lfp.append(cnt_lfp)
+        self.cnts_lfp = np.array(self.cnts_lfp)
         
             
     def draw_debug(self, cam, img_cam=None):
@@ -125,6 +134,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         if self.display_mode in [Contour2Pipeline.show_contour]:
             if self.lane_model.is_valid():
                 self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max)
+                #self.lane_model.draw_on_cam_img(debug_img, cam, l0=0.3, l1=1.2)
             
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
         h1, c1, dy = 1., (18, 200, 5), 30
@@ -132,8 +142,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.draw_timing(debug_img, x0=360, y0=40)
         try:
             nb_valid_contours = len(self.contour_finder.valid_cnts)
-        except AttributeError:
-            rospy.loginfo_throttle(1., "Lane2: no valid contour") # print every second
+        except TypeError:
+            #rospy.loginfo_throttle(1., "Lane2: no valid contour") # print every second
             nb_valid_contours = 0
         cv2.putText(debug_img, 'valid contours: {}'.format(nb_valid_contours), (20, 90), f, h1, c1, w)
         cv2.putText(debug_img, 'model: {} valid'.format('' if self.lane_model.is_valid() else 'not'), (20, 90+dy), f, h1, c1, w)
