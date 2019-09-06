@@ -55,7 +55,7 @@ class CarolineBirdEyeParam(BirdEyeParam):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.30, dx=1.75, dy=1., w=480):
+    def __init__(self, x0=0.30, dx=4., dy=1., w=480):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 def NamedBirdEyeParam(_name):

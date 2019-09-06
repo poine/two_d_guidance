@@ -10,8 +10,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def __init__(self, cam, be_param=trr_vu.BirdEyeParam(), use_single_contour=False, ctr_img_min_area=200):
         trr_vu.Pipeline.__init__(self)
         self.use_single_contour = use_single_contour
+        self.cam = cam
         self.set_roi((0, 0), (cam.w, cam.h))
-        #self.set_roi((0, 70), (cam.w, cam.h))
         self.thresholder = trr_vu.BinaryThresholder()
         self.contour_finder = trr_vu.ContourFinder(min_area=ctr_img_min_area)
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)
@@ -20,18 +20,30 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.img = None
         self.cnt_max_be = None
         self.use_single_contour = use_single_contour
+        
+    def init_masks(self):
+        y0, x1, x2, y3 = 81, 346, 452, 80
+        self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, 0], [x2,0], [self.cam.w, y3],  [self.cam.w, 0] ] )
+        self.be_mask_noroi = self.be_mask_roi + self.tl
+        y0, x1, y1, x2, y3 = 350, 150, self.cam.h-20, 600, 350
+        self.car_mask = np.array( [ [0, self.cam.h], [0, y0], [x1, y1], [x2,y1], [self.cam.w, y3],  [self.cam.w, self.cam.h] ] )
+        self.car_mask_roi = self.car_mask - self.tl
 
     def set_roi(self, tl, br):
         print('roi: {} {}'.format(tl, br))
         self.tl, self.br = tl, br
         self.roi_h, self.roi_w = self.br[1]-self.tl[1], self.br[0]-self.tl[0]
         self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
+        self.init_masks()
         
     def _process_image(self, img, cam):
         self.img = img
         self.img_roi = img[self.roi]
         self.img_gray = cv2.cvtColor(self.img_roi, cv2.COLOR_BGR2GRAY )
         self.thresholder.process(self.img_gray)
+        ### masks...
+        cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)
+        
         self.contour_finder.process(self.thresholder.threshold)
         if self.use_single_contour:
             self._process_max_area_contour(cam)
@@ -64,44 +76,11 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
-            
 
             
     def _compute_contours_lfp(self, cam):
         self.cnts_be, self.cnts_lfp = [], []
         if self.contour_finder.valid_cnts is None: return
-
-        if 0:
-            for i, c in enumerate(self.contour_finder.valid_cnts):
-                #print('ctr {}'.format(i))
-                # Compute contour vertices in optical plan (undistort)
-                cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
-                #trr_u.print_extends(cnt_imp.squeeze(), ' undis')
-                # Compute contour vertices in bird eye coordinates
-                cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
-                #trr_u.print_extends(cnt_be.squeeze(),  ' be   ', full=True)
-                # Filter out points that are outside bird eye area
-                cnt_be1 = []
-                #print('  shape undist {}'.format(cnt_be.shape))
-                for p in cnt_be.squeeze():
-                    if p[0] >= 0 and p[0] < self.bird_eye.w and p[1]>=0 and p[1]<self.bird_eye.h:
-                        cnt_be1.append(p)
-                cnt_be1 = np.array(cnt_be1).reshape(-1, 1, 2)
-                #print('  shape undist2 {}'.format(cnt_be1.shape))
-                min_vertices = 5
-                if cnt_be1.shape[0] > min_vertices: # we have not removed all the contour
-                    #trr_u.print_extends(cnt_be1.squeeze(),  ' be1   ')
-                    self.cnts_be.append(cnt_be1)
-                    try:
-                        cnt_lfp = self.bird_eye.unwarped_to_fp(cam, cnt_be1)
-                    except IndexError:
-                        pdb.set_trace()
-                        #trr_u.print_extends(cnt_lfp.squeeze(),  ' lfp   ')
-                        self.cnts_lfp.append(cnt_lfp)
-                #else:
-                #    self.cnts_be.append(c_be1)  # empty to keep sorting happy
-                #    self.cnts_lfp.append(c_be1)
-                
         
         for i, c in enumerate(self.contour_finder.valid_cnts):
             cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
@@ -111,7 +90,9 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.cnts_lfp.append(cnt_lfp)
         self.cnts_lfp = np.array(self.cnts_lfp)
         
-            
+
+
+        
     def draw_debug(self, cam, img_cam=None):
         return cv2.cvtColor(self.draw_debug_bgr(cam, img_cam), cv2.COLOR_BGR2RGB)
     
@@ -119,22 +100,31 @@ class Contour2Pipeline(trr_vu.Pipeline):
         if self.img is None: return np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         if self.display_mode == Contour2Pipeline.show_input:
             debug_img = self.img
+            # roi
             cv2.rectangle(debug_img, tuple(self.tl), tuple(self.br), color=(0, 0, 255), thickness=3)
+            # masks
+            be_corners_img = self.bird_eye.va_img.reshape((1, -1, 2)).astype(np.int)
+            cv2.polylines(debug_img, be_corners_img, isClosed=True, color=(0, 0, 255), thickness=2)
+            cv2.polylines(debug_img, [self.be_mask_noroi], isClosed=True, color=(0, 255, 255), thickness=2)
+            cv2.polylines(debug_img, [self.car_mask], isClosed=True, color=(0, 255, 255), thickness=2)
+        
         elif self.display_mode == Contour2Pipeline.show_thresh:
             roi_img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
         elif self.display_mode == Contour2Pipeline.show_contour:
             roi_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
             self.contour_finder.draw(roi_img, draw_all=True)
+            cv2.fillPoly(roi_img, [self.be_mask_roi, self.car_mask_roi], color=(255, 0, 255))
         elif self.display_mode == Contour2Pipeline.show_be:
             debug_img = self._draw_be(cam)
 
         if self.display_mode not in [Contour2Pipeline.show_input, Contour2Pipeline.show_be] :
             debug_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.uint8)
             debug_img[self.roi] = roi_img
-        if self.display_mode in [Contour2Pipeline.show_contour]:
+        if self.display_mode in [Contour2Pipeline.show_contour, Contour2Pipeline.show_input]:
             if self.lane_model.is_valid():
-                self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max)
+                self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max, color=(0,128,255))
                 #self.lane_model.draw_on_cam_img(debug_img, cam, l0=0.3, l1=1.2)
+    
             
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
         h1, c1, dy = 1., (18, 200, 5), 30
