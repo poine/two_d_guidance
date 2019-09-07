@@ -253,6 +253,7 @@ class ContourFinder:
         self.min_area = min_area
         self.single_contour = single_contour
         self.img = None
+        self.cnts = None
         self.cnt_max = None
         self.cnt_max_area = 0
         self.valid_cnts = None
@@ -292,8 +293,11 @@ class ContourFinder:
                     #print self.cnt_max.shape
                     pass
             cv2.drawContours(img, self.cnt_max, -1, mc_border_color, thickness)
-        if draw_all and self.valid_cnts is not None:
-            for c in self.valid_cnts: cv2.fillPoly(img, pts =[c], color=ac_fill_color)
+
+    def draw2(self, img, cnts, cnts_mask, fill_color1=(0, 128, 0), fill_color2=(0, 0, 128)):
+        for c, inlier in zip(cnts, cnts_mask):
+            cv2.drawContours(img, c, -1, (255, 0, 0), 2)
+            cv2.fillPoly(img, pts =[c], color=fill_color1 if inlier else fill_color2)
             
 
 class ColoredContourDetector:
@@ -420,7 +424,7 @@ class BinaryThresholder:
         blurred = cv2.GaussianBlur(img, (9, 9), 0)
         #blurred = cv2.GaussianBlur(img, (25, 25), 0)
         #self.threshold = blurred
-        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
         #ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         #self.threshold = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 151, -30)
         #self.threshold = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 101, -30)

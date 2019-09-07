@@ -3,6 +3,7 @@ import os, sys, roslib, rospy, rospkg, rostopic
 import visualization_msgs.msg, geometry_msgs.msg
 import math, numpy as np
 import cv2
+import pdb
 
 import two_d_guidance as tdg
 import two_d_guidance.ros_utils as ros_utils
@@ -47,7 +48,7 @@ class TrrPath(tdg.path.Path):
         np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, jerks=self.jerks)
 
 
-
+import matplotlib.pyplot as plt
 class LaneModel:
     # center line as polynomial
     # y = an.x^n + ...
@@ -61,20 +62,46 @@ class LaneModel:
     def get_y(self, x):
         return np.polyval(self.coefs, x)
 
-    def fit(self, ctrs, order=3):
+    def fit2(self, ctrs, ctrs_area, order=3):
         sum_ctrs = np.concatenate(ctrs, axis=0)
         pts = sum_ctrs.squeeze()
         xs, ys = pts[:,0], pts[:,1]
         self.coefs = np.polyfit(xs, ys, order)
         self.x_min, self.x_max = np.min(xs), np.max(xs)
 
-    def fit2(self, cnts, order=3):
+    def fit(self, ctrs, ctrs_area, order=3):
+        self.res = [self._residual(_c) for _c in ctrs]
+        self.inliers_mask = np.full(len(ctrs), True)
         if self.valid:
-            pass
+            if len(ctrs) < 2:
+                self.fit2(ctrs, ctrs_area, order)
+            else:
+                #self._plot(ctrs)
+                #pdb.set_trace()
+                #np.polyfit(c[:,0, 0], c[:,0, 1], order, full=True)
+                #pdb.set_trace()
+                #inliers_idx = res < np.float64(0.03)#np.median(res)
+                self.inliers_mask = self.res < 1.4*np.mean(self.res)
+                #print self.res, np.median(self.res), np.mean(self.res), self.inliers_mask
+                self.fit2(ctrs[self.inliers_mask], ctrs_area, order)
         else:
-            pass
-        
-    
+            #self.fit2(ctrs[np.argmax(ctrs_area)], None, order)
+            self.fit2(ctrs, ctrs_area, order)
+
+    def _plot(self, ctrs):
+        for c in ctrs:
+            plt.plot(c[:,0,0], c[:,0,1])
+        xs = np.linspace(self.x_min, self.x_max)
+        plt.plot(xs, np.polyval(self.coefs,xs))
+        #pdb.set_trace()
+        #plt.gca().axis('equal')
+        plt.gca().set_aspect('equal', 'box')
+        plt.show()
+
+            
+    def _residual(self, c):
+        return np.linalg.norm(np.polyval(self.coefs, c[:,0, 0]) - c[:,0, 1])/len(c[:,0, 0])
+            
     def draw_on_cam_img(self, img, cam, l0=0.1, l1=0.7, color=(0,128,0)):
         xs = np.linspace(l0, l1, 20); ys = self.get_y(xs)
         pts_world = np.array([[x, y, 0] for x, y in zip(xs, ys)])

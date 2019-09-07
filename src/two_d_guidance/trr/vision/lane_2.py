@@ -66,7 +66,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         ''' fit all valid contours '''
         self._compute_contours_lfp(cam)
         if len(self.cnts_lfp) > 0:
-            self.lane_model.fit(self.cnts_lfp)
+            self.lane_model.fit(self.cnts_lfp,  self.cnt_lfp_areas)
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
@@ -107,7 +107,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
             roi_img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
         elif self.display_mode == Contour2Pipeline.show_contour:
             roi_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            self.contour_finder.draw(roi_img, draw_all=True)
+            self.contour_finder.draw2(roi_img, self.contour_finder.valid_cnts, self.lane_model.inliers_mask)
+            #self.contour_finder.draw(roi_img, draw_all=True)
             cv2.fillPoly(roi_img, [self.be_mask_roi, self.car_mask_roi], color=(255, 0, 255))
         elif self.display_mode == Contour2Pipeline.show_be:
             debug_img = self._draw_be(cam)
@@ -120,7 +121,11 @@ class Contour2Pipeline(trr_vu.Pipeline):
                 self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max, color=(0,128,255))
                 #self.lane_model.draw_on_cam_img(debug_img, cam, l0=0.3, l1=1.2)
     
-            
+        self._draw_HUD(debug_img)
+        # we return a BGR image
+        return debug_img
+
+    def _draw_HUD(self, debug_img):
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
         h1, c1, dy = 1., (18, 200, 5), 30
         cv2.putText(debug_img, 'Lane#2', (20, 40), f, h, c, w)
@@ -132,9 +137,13 @@ class Contour2Pipeline(trr_vu.Pipeline):
             nb_valid_contours = 0
         cv2.putText(debug_img, 'valid contours: {}'.format(nb_valid_contours), (20, 90), f, h1, c1, w)
         cv2.putText(debug_img, 'model: {} valid'.format('' if self.lane_model.is_valid() else 'not'), (20, 90+dy), f, h1, c1, w)
-        # we return a BGR image
-        return debug_img
+        res = np.float('inf') if not self.lane_model.is_valid() else self.lane_model.res[0]
+        cv2.putText(debug_img, 'residual: {:.4f}'.format(res), (20, 90+2*dy), f, h1, c1, w)
 
+    
+    def _draw_contours(self, cam):
+        pass
+    
     def _draw_be(self, cam):
         try:
             if self.use_single_contour:
