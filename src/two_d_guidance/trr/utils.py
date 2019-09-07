@@ -61,10 +61,19 @@ class LaneModel:
     def get_y(self, x):
         return np.polyval(self.coefs, x)
 
-    def fit(self, pts, order=3):
+    def fit(self, ctrs, order=3):
+        sum_ctrs = np.concatenate(ctrs, axis=0)
+        pts = sum_ctrs.squeeze()
         xs, ys = pts[:,0], pts[:,1]
         self.coefs = np.polyfit(xs, ys, order)
         self.x_min, self.x_max = np.min(xs), np.max(xs)
+
+    def fit2(self, cnts, order=3):
+        if self.valid:
+            pass
+        else:
+            pass
+        
     
     def draw_on_cam_img(self, img, cam, l0=0.1, l1=0.7, color=(0,128,0)):
         xs = np.linspace(l0, l1, 20); ys = self.get_y(xs)

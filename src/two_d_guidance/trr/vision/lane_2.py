@@ -21,7 +21,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.cnt_max_be = None
         self.use_single_contour = use_single_contour
         
-    def init_masks(self):
+    def init_masks(self): # FIXME, compute that from be params
         y0, x1, x2, y3 = 81, 346, 452, 80
         self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, 0], [x2,0], [self.cam.w, y3],  [self.cam.w, 0] ] )
         self.be_mask_noroi = self.be_mask_roi + self.tl
@@ -65,14 +65,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def _process_all_contours(self, cam):
         ''' fit all valid contours '''
         self._compute_contours_lfp(cam)
-        # if 0: # sorted by img area , broken
-        #     sorted_cnts_lfp = self.cnts_lfp[self.contour_finder.valib_cnt_areas_order]
-        #     nb_ctr = min(len(self.cnts_lfp), 3)
-        #     sum_ctr_lfp = np.concatenate(sorted_cnts_lfp[nb_ctr::-1], axis=0)
-        # else: #  all
         if len(self.cnts_lfp) > 0:
-            sum_ctr_lfp = np.concatenate(self.cnts_lfp, axis=0)
-            self.lane_model.fit(sum_ctr_lfp.squeeze())
+            self.lane_model.fit(self.cnts_lfp)
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
@@ -88,6 +82,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             #self.cnts_be.append(cnt_be)
             cnt_lfp = self.bird_eye.points_imp_to_blf(cnt_imp)
             self.cnts_lfp.append(cnt_lfp)
+        self.cnt_lfp_areas = [cv2.contourArea(_c) for _c in self.cnts_lfp]
         self.cnts_lfp = np.array(self.cnts_lfp)
         
 

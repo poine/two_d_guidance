@@ -55,7 +55,7 @@ class CarolineBirdEyeParam(BirdEyeParam):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.30, dx=4., dy=1., w=480):
+    def __init__(self, x0=0.30, dx=4., dy=2., w=480):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 def NamedBirdEyeParam(_name):
@@ -276,7 +276,7 @@ class ContourFinder:
                 self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
                 self.valid_cnts_idx = self.cnt_areas > self.min_area
                 self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
-                # sort by area ?
+                # sort by area ? no, useless
                 if False:
                     self.valid_cnt_areas = self.cnt_areas[self.valid_cnts_idx]
                     self.valib_cnt_areas_order = np.argsort(self.valid_cnt_areas)
@@ -418,7 +418,12 @@ class BinaryThresholder:
         
     def process(self, img):
         blurred = cv2.GaussianBlur(img, (9, 9), 0)
-        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
+        #blurred = cv2.GaussianBlur(img, (25, 25), 0)
+        #self.threshold = blurred
+        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        #ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        #self.threshold = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 151, -30)
+        #self.threshold = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 101, -30)
         return self.threshold
 
     def set_threshold(self, thresh): self.thresh_val = thresh
