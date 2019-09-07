@@ -35,7 +35,6 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
             robot_name = rospy.get_param('~robot_name', 'christine')#'caroline'
             param = trr_vu.NamedBirdEyeParam(robot_name)
             rospy.loginfo("  using {} bird eye".format(robot_name))
-            #param = trr_vu.BirdEyeParam(x0=-0.3, dx=3., dy=3., w=480)
             self.pipeline.bird_eye.set_param(param)
             self.pipeline.bird_eye.compute_H(self.cam)
             self.pipeline.bird_eye.compute_H2(self.cam)
