@@ -75,17 +75,15 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def _compute_contours_lfp(self, cam):
         self.cnts_be, self.cnts_lfp = [], []
         if self.contour_finder.valid_cnts is None: return
-        
+
         for i, c in enumerate(self.contour_finder.valid_cnts):
             cnt_imp = cam.undistort_points((c+ self.tl).astype(np.float32))
-            #cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
-            #self.cnts_be.append(cnt_be)
+            cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
+            self.cnts_be.append(cnt_be)
             cnt_lfp = self.bird_eye.points_imp_to_blf(cnt_imp)
             self.cnts_lfp.append(cnt_lfp)
         self.cnt_lfp_areas = [cv2.contourArea(_c) for _c in self.cnts_lfp]
         self.cnts_lfp = np.array(self.cnts_lfp)
-        
-
 
         
     def draw_debug(self, cam, img_cam=None):
@@ -98,18 +96,15 @@ class Contour2Pipeline(trr_vu.Pipeline):
             # roi
             cv2.rectangle(debug_img, tuple(self.tl), tuple(self.br), color=(0, 0, 255), thickness=3)
             # masks
-            be_corners_img = self.bird_eye.va_img.reshape((1, -1, 2)).astype(np.int)
-            cv2.polylines(debug_img, be_corners_img, isClosed=True, color=(0, 0, 255), thickness=2)
+            #be_corners_img = self.bird_eye.param.corners_be_img.reshape((1, -1, 2)).astype(np.int)
+            #cv2.polylines(debug_img, be_corners_img, isClosed=True, color=(0, 0, 255), thickness=2)
             cv2.polylines(debug_img, [self.be_mask_noroi], isClosed=True, color=(0, 255, 255), thickness=2)
             cv2.polylines(debug_img, [self.car_mask], isClosed=True, color=(0, 255, 255), thickness=2)
         
         elif self.display_mode == Contour2Pipeline.show_thresh:
             roi_img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
         elif self.display_mode == Contour2Pipeline.show_contour:
-            roi_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
-            self.contour_finder.draw2(roi_img, self.contour_finder.valid_cnts, self.lane_model.inliers_mask)
-            #self.contour_finder.draw(roi_img, draw_all=True)
-            cv2.fillPoly(roi_img, [self.be_mask_roi, self.car_mask_roi], color=(255, 0, 255))
+            roi_img = self._draw_contour(cam)
         elif self.display_mode == Contour2Pipeline.show_be:
             debug_img = self._draw_be(cam)
 
@@ -127,7 +122,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
 
     def _draw_HUD(self, debug_img):
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
-        h1, c1, dy = 1., (18, 200, 5), 30
+        h1, c1, dy = 1., (220, 130, 120), 30
         cv2.putText(debug_img, 'Lane#2', (20, 40), f, h, c, w)
         self.draw_timing(debug_img, x0=360, y0=40)
         try:
@@ -135,21 +130,28 @@ class Contour2Pipeline(trr_vu.Pipeline):
         except TypeError:
             #rospy.loginfo_throttle(1., "Lane2: no valid contour") # print every second
             nb_valid_contours = 0
-        cv2.putText(debug_img, 'valid contours: {}'.format(nb_valid_contours), (20, 90), f, h1, c1, w)
-        cv2.putText(debug_img, 'model: {} valid'.format('' if self.lane_model.is_valid() else 'not'), (20, 90+dy), f, h1, c1, w)
-        res = np.float('inf') if not self.lane_model.is_valid() else self.lane_model.res[0]
-        cv2.putText(debug_img, 'residual: {:.4f}'.format(res), (20, 90+2*dy), f, h1, c1, w)
+        y0 = 120
+        cv2.putText(debug_img, 'valid contours: {}'.format(nb_valid_contours), (20, y0), f, h1, c1, w)
+        cv2.putText(debug_img, 'model: {} valid'.format('' if self.lane_model.is_valid() else 'not'), (20, y0+dy), f, h1, c1, w)
+        res = np.float('inf') if not self.lane_model.is_valid() else np.mean(self.lane_model.res)
+        cv2.putText(debug_img, 'residual: {:.4f}'.format(res), (20, y0+2*dy), f, h1, c1, w)
 
     
-    def _draw_contours(self, cam):
-        pass
-    
+    def _draw_contour(self, cam, mask_color=(150, 150, 120)):
+        roi_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
+        self.contour_finder.draw2(roi_img, self.contour_finder.valid_cnts, self.lane_model.inliers_mask)
+        #self.contour_finder.draw(roi_img, draw_all=True)
+        cv2.fillPoly(roi_img, [self.be_mask_roi, self.car_mask_roi], color=mask_color)
+        return roi_img
+        
     def _draw_be(self, cam):
         try:
             if self.use_single_contour:
                 debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, [self.cnt_max_be])
             else:
-                debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, self.cnts_be)
+                undistorted_img = cam.undistort_img2(self.img)
+                unwarped_img = self.bird_eye.process(undistorted_img)
+                debug_img = self.bird_eye.draw_debug(cam, unwarped_img, self.lane_model, self.cnts_be)
         except AttributeError:
             debug_img = np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         return debug_img

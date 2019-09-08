@@ -10,7 +10,7 @@ class Contour1Pipeline(trr_vu.Pipeline):
     def __init__(self, cam):
         trr_vu.Pipeline.__init__(self)
         self.thresholder = trr_vu.BinaryThresholder()
-        self.contour_finder = trr_vu.ContourFinder(min_area=100)
+        self.contour_finder = trr_vu.ContourFinder(min_area=500)
         self.floor_plane_injector = trr_vu.FloorPlaneInjector()
         self.bird_eye = trr_vu.BirdEyeTransformer(cam,  trr_vu.BirdEyeParam(x0=-0.3, dx=3., dy=3., w=480))
         self.lane_model = trru.LaneModel()
@@ -34,7 +34,7 @@ class Contour1Pipeline(trr_vu.Pipeline):
             x_min, x_max   = np.min(self.cnt_max_blf[:,0]), np.max(self.cnt_max_blf[:,0])
             y_min, y_max = np.min(self.cnt_max_blf[:,1]), np.max(self.cnt_max_blf[:,1])
             print('x in [{:.2f} {:.2f}] y in [{:.2f} {:.2f}]'.format(x_min, x_max, y_min, y_max))
-            self.lane_model.fit(self.cnt_max_blf)
+            self.lane_model.fit_all_contours(self.cnt_max_blf.reshape((1, -1, 2)))
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)

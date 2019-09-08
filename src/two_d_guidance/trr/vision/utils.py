@@ -4,6 +4,7 @@ import time, math, numpy as np
 import cv2
 from matplotlib import pyplot as plt
 import yaml
+import shapely, shapely.geometry
 
 import two_d_guidance.trr.utils as trr_u, smocap
 import pdb
@@ -26,7 +27,7 @@ def load_cam_from_files(intr_path, extr_path, cam_name='cam1', alpha=1.):
     cam.load_extrinsics(extr_path)
     return cam
 
-# read an array of points - this is used for birdeye calibration
+# read an array of points - this is used for extrinsic calibration
 def read_point(yaml_data_path):
     with open(yaml_data_path, 'r') as stream:
         ref_data = yaml.load(stream)
@@ -40,37 +41,44 @@ def read_point(yaml_data_path):
 class BirdEyeParam:
     def __init__(self, x0=0.6, dx=1.2, dy=1.2, w=1024):
         # coordinates of viewing area on local floorplane in base_footprint frame
-        #self.x0, self.dx, self.dy = 0.3, 1.5, 2.0 # breaks in reality? works in gazebo
-        self.x0, self.dx, self.dy = x0, dx, dy#0.6, 1.2, 1.2
-        
-        #w = 1280; h = int(dx/dy*w)
-        self.w = w; self.h = int(self.dx/self.dy*self.w)
+        self.x0, self.dx, self.dy = x0, dx, dy
+        # coordinates of viewing area as a pixel array (unwarped)
+        self.w = w; self.s = self.dy/self.w; self.h = int(self.dx/self.s)
+
         # viewing area in base_footprint frame
         # bottom_right, top_right, top_left, bottom_left in base_footprint frame
-        self.va_bf = np.array([(self.x0, self.dy/2, 0.), (self.x0+self.dx, self.dy/2, 0.), (self.x0+self.dx, -self.dy/2, 0.), (self.x0, -self.dy/2, 0.)])
-
+        self.corners_be_blf = np.array([(self.x0, self.dy/2, 0.), (self.x0+self.dx, self.dy/2, 0.), (self.x0+self.dx, -self.dy/2, 0.), (self.x0, -self.dy/2, 0.)])
+        self.corners_be_img = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
+        
 class CarolineBirdEyeParam(BirdEyeParam):
-    #def __init__(self, x0=0.25, dx=1.2, dy=0.6, w=480): # real
-    def __init__(self, x0=0.1, dx=2., dy=1.5, w=480):  # gazebo
+    #def __init__(self, x0=0.4, dx=0.9, dy=0.2, w=480): # inside
+    #def __init__(self, x0=0.28, dx=0.9, dy=0.8, w=480): # real
+    def __init__(self, x0=0.1, dx=2., dy=1.5, w=480):  # outside
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
 class ChristineBirdEyeParam(BirdEyeParam):
-    def __init__(self, x0=0.30, dx=4., dy=2., w=480):
+    #def __init__(self, x0=0.30, dx=4., dy=2., w=480):
+    def __init__(self, x0=0.30, dx=3., dy=2., w=640):
         BirdEyeParam.__init__(self, x0, dx, dy, w)
-
+        
 def NamedBirdEyeParam(_name):
     if    _name == 'caroline':  return CarolineBirdEyeParam()
     elif  _name == 'christine': return ChristineBirdEyeParam()
+    return None
 
-def make_3d_line(p0, p1, spacing=200, endpoint=True):
+def _make_line(p0, p1, spacing=1, endpoint=True):
     dist = np.linalg.norm(p1-p0)
     n_pt = dist/spacing
     if endpoint: n_pt += 1
-    return np.stack([np.linspace(p0[j], p1[j], n_pt, endpoint=endpoint) for j in range(3)], axis=-1)
+    return np.stack([np.linspace(p0[j], p1[j], n_pt, endpoint=endpoint) for j in range(len(p0))], axis=-1)
+
+def _lines_of_corners(corners, spacing):
+    return np.concatenate([_make_line(corners[i-1], corners[i], spacing=spacing, endpoint=False) for i in range(len(corners))])
 
 class BirdEyeTransformer:
     def __init__(self, cam, be_param):
         self.set_param(be_param)
+        self.compute_cam_viewing_area(cam)
         self.compute_H(cam)
         self.compute_H2(cam)
         self.cnt_fp = None
@@ -81,41 +89,77 @@ class BirdEyeTransformer:
         self.param = be_param
         self.w, self.h = be_param.w, be_param.h
 
-    # compute Homography from image plan to be image
+    def compute_cam_viewing_area(self, cam, max_dist=6):
+        # compute the contour of the intersection between camera frustum and floor plane
+        corners_cam_img = np.array([[0., 0], [cam.w, 0], [cam.w, cam.h], [0, cam.h], [0, 0]])
+        borders_cam_img = _lines_of_corners(corners_cam_img, spacing=1)
+        borders_undistorted = cam.undistort_points(borders_cam_img.reshape(-1, 1, 2))
+        borders_cam = np.array([np.dot(cam.inv_undist_K, [u, v, 1]) for (u, v) in borders_undistorted.squeeze()])
+        borders_floor_plane_cam = get_points_on_plane(borders_cam, cam.fp_n, cam.fp_d)
+        in_frustum_idx = np.logical_and(borders_floor_plane_cam[:,2]>0, borders_floor_plane_cam[:,2]<max_dist)
+        borders_floor_plane_cam = borders_floor_plane_cam[in_frustum_idx,:]
+        self.borders_floor_plane_world = np.array([np.dot(cam.cam_to_world_T[:3], p.tolist()+[1]) for p in borders_floor_plane_cam])
+
+        # compute intersection between camera view and bird eye areas
+        poly_va_blf = shapely.geometry.Polygon(self.borders_floor_plane_world[:,:2])
+        poly_be_blf = shapely.geometry.Polygon(self.param.corners_be_blf[:,:2])
+        foo = poly_va_blf.intersection(poly_be_blf).exterior.coords.xy
+        self.borders_isect_be_cam = np.zeros((len(foo[0]), 3))
+        self.borders_isect_be_cam[:,:2] = np.array(foo).T
+
+        # compute masks
+        if 0:  # TODO
+            self.mask_blf = np.array([(0, 0), (0.3, -0.3), (0, -0.3), (0, 0)])
+            #pdb.set_trace()
+            self.mask_unwraped = self.lfp_to_unwarped2(cam, self.mask_blf).reshape((1,-1,2)).astype(np.int64)
+            print self.mask_unwraped
+        else:
+            y0, y1, y2 = 680, 940, 960
+            x1, x2, x3 = 250, 380, 640 
+            self.mask_unwraped = np.array([[(0, y0), (x1, y1), (x2, y1), (x3, y0), (x3, y2), (0, y2)]])
+        #print self.mask_unwraped.shape
+        #print self.mask_unwraped.dtype
+
+
+        
+        
+    def _img_point_in_camera_frustum(self, pts_img, cam): return np.logical_and(pts_img[:,0,0] > 0, pts_img[:,0,0] < cam.w)
+
+    # compute Homography from image plan to be image (unwarped)
     def compute_H(self, cam):
-        ''' fails is I use be points that are outside of cam frustum '''
-        print('bird eye compute H')
-        self.va_img = cam.project(self.param.va_bf)
-        print('w {} h {}'.format(self.w, self.h))
-        for pt_img in self.va_img.squeeze():
-            if (pt_img[0] < 0 or pt_img[0] > self.h) or (pt_img[1] < 0 or pt_img[1] > self.w):
-                print '###### Fail {}'.format(pt_img)
-        print('  viewing area img\n{}'.format(self.va_img.squeeze()))
-        self.va_img_undistorted = cam.undistort_points(self.va_img)
-        pts_src = self.va_img_undistorted.squeeze()
-        print('  viewing area undist\n{}'.format(self.va_img_undistorted.squeeze()))
-        pts_dst = np.array([[0, self.h], [0, 0], [self.w, 0], [self.w, self.h]])
-        print('  be_dest\n{}'.format(pts_dst))
-        self.H, status = cv2.findHomography(pts_src, pts_dst)
-        print('calibrated bird eye be: ({})\n{}'.format(status.squeeze(), self.H))
+        print('### bird eye compute H for be_img\narea:\n{}'.format(self.param.corners_be_blf))
+        va_corners_img  = cam.project(self.borders_isect_be_cam)
+        va_corners_imp  = cam.undistort_points(va_corners_img)
+        #print('corners imp\n{}'.format(va_corners_imp))
+        va_corners_unwarped = self.lfp_to_unwarped(cam, self.borders_isect_be_cam.squeeze())
+        self.H, status = cv2.findHomography(srcPoints=va_corners_imp, dstPoints=va_corners_unwarped, method=cv2.RANSAC, ransacReprojThreshold=0.01)
+        print('computed H unwarped: ({}/{} inliers)\n{}'.format( np.count_nonzero(status), len(va_corners_imp), self.H))
 
     # compute Homography from image plan to base link footprint
     def compute_H2(self, cam):
-        if 1:
-            va_vert_blf = self.param.va_bf
-            va_lines_blf = np.concatenate([make_3d_line(va_vert_blf[i-1], va_vert_blf[i], spacing=0.01, endpoint=False) for i in range(len(va_vert_blf))])
-            va_lines_img = cam.project(va_lines_blf)
-            va_valid_idx = np.logical_and(va_lines_img[:,0,0] > 0, va_lines_img[:,0,0] < cam.w)
-            va_lines_imp = cam.undistort_points(va_lines_img[va_valid_idx])
-            self.H2, status = cv2.findHomography(va_lines_imp, va_lines_blf[va_valid_idx], cv2.RANSAC, 0.00001)
-        else:
-            #pdb.set_trace()
-            self.va_img = cam.project(self.param.va_bf)
+        print('### bird eye compute H for be_blf\narea:\n{}'.format(self.param.corners_be_blf))
+        va_corners_img  = cam.project(self.borders_isect_be_cam)
+        va_corners_imp  = cam.undistort_points(va_corners_img)
+        pts_src = va_corners_imp.squeeze()
+        pts_dst = self.borders_isect_be_cam.squeeze()
+        self.H2, status = cv2.findHomography(srcPoints=va_corners_imp, dstPoints=self.borders_isect_be_cam, method=cv2.RANSAC, ransacReprojThreshold=0.01)
+        print('computed H blf: ({}/{} inliers)\n{}'.format(np.count_nonzero(status), len(va_corners_imp), self.H2))
+             
+        if 0:  # use corners of viewing area - fails is bird eye area not included in viewing area
+            self.va_img = cam.project(self.param.corners_be_blf)
             self.va_img_undistorted = cam.undistort_points(self.va_img)
             pts_src = self.va_img_undistorted.squeeze()
-            pts_dst = self.param.va_bf
+            pts_dst = self.param.corners_be_blf
             self.H2, status = cv2.findHomography(pts_src, pts_dst)
-        print('calibrated bird eye blf: ({})\n{}'.format(status.squeeze(), self.H2))
+        if 0: # make sure we only use points inside camera's frustum
+            #va_vert_blf = self.param.corners_be_blf
+            va_lines_blf = _lines_of_corners(self.param.corners_be_blf, 0.01)
+            va_lines_img = cam.project(va_lines_blf)
+            va_valid_idx =  self._img_point_in_camera_frustum(va_lines_img, cam)
+            va_lines_imp = cam.undistort_points(va_lines_img[va_valid_idx])
+            self.H2, status = cv2.findHomography(va_lines_imp, va_lines_blf[va_valid_idx], cv2.RANSAC, 0.00001)
+            nb_inliers = np.count_nonzero(status)
+            print('computed H blf: ({}/{} inliers)\n{}'.format(nb_inliers, len(va_lines_blf), self.H2))
         
     def plot_calibration(self, img_undistorted):
         pass
@@ -124,7 +168,6 @@ class BirdEyeTransformer:
         return cv2.perspectiveTransform(points_imp, self.H)
 
     def unwarped_to_fp(self, cam, cnt_uw):
-        #pdb.set_trace()
         s = self.param.dy/self.param.w
         self.cnt_fp = np.array([((self.param.h-p[1])*s+self.param.x0, (self.param.w/2-p[0])*s, 0.) for p in cnt_uw.squeeze()])
         return self.cnt_fp
@@ -134,19 +177,26 @@ class BirdEyeTransformer:
         cnt_uv = np.array([(self.param.w/2-y/s, self.param.h-(x-self.param.x0)/s) for x, y, _ in cnt_lfp])
         return cnt_uv
 
+    def lfp_to_unwarped2(self, cam, cnt_lfp):
+        s = self.param.dy/self.param.w
+        cnt_uv = np.array([(self.param.w/2-y/s, self.param.h-(x-self.param.x0)/s) for x, y in cnt_lfp])
+        return cnt_uv
+    
+
     def points_imp_to_blf(self, points_imp):
         return cv2.perspectiveTransform(points_imp, self.H2)
     
 
     def process(self, img):
-        self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h), borderMode=cv2.BORDER_CONSTANT)
+        #pdb.set_trace()
+        self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h), borderMode=cv2.BORDER_CONSTANT, borderValue=0)
         return self.unwarped_img
 
     def draw_debug(self, cam, img=None, lane_model=None, cnts_be=None, border_color=128, fill_color=(255, 0, 255)):
         if img is None:
             img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates
-        elif img.dtype == np.uint8:
-            img = img.astype(np.float32)/255.
+        # elif img.dtype == np.uint8:
+        #     img = img.astype(np.float32)/255.
         if  cnts_be is not None:
             for cnt_be in cnts_be:
                 cnt_be_int = cnt_be.astype(np.int32)
@@ -154,8 +204,7 @@ class BirdEyeTransformer:
                 cv2.fillPoly(img, pts =[cnt_be_int], color=fill_color)
         if lane_model is not None and lane_model.is_valid():
             self.draw_lane(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
-        out_img = change_canvas(img, cam.h, cam.w)
-        return out_img
+        return change_canvas(img, cam.h, cam.w)
 
     def draw_lane(self, cam, img, lane_model, l0=0.6, l1=1.8, color=(0,128,0)):
         # Coordinates in local_floor_plane(aka base_link_footprint) frame
@@ -449,21 +498,24 @@ class BlackWhiteThresholder:
 
         
 class HoughLinesFinder:
-    def __init__(self):
+    def __init__(self, mask):
         self.img, self.lines, self.vlines = None, None, None
         y0, y1, y2 = 850, 950, 1000
         x1, x2, x3 = 110, 350, 480 
-        self.mask_be = np.array([[(0, y0), (x1, y1), (x2, y1), (x3, y0), (x3, y2), (0, y2)]])
+        self.mask = mask#np.array([[(0, y0), (x1, y1), (x2, y1), (x3, y0), (x3, y2), (0, y2)]])
         self.use_mask=True
         
     def process(self, img, minval=100, maxval=200):
         self.edges = cv2.Canny(img, minval, maxval, apertureSize=3)
-        if self.use_mask: cv2.fillPoly(self.edges, pts =self.mask_be, color=(0))
+        if self.use_mask: cv2.fillPoly(self.edges, pts =self.mask, color=(128))
         rho_acc, theta_acc = 6, np.deg2rad(1)
         lines, threshold = 80, 30
-        minLineLength, maxLineGap = 50, 25
+        minLineLength, maxLineGap = 200, 25
         self.lines = cv2.HoughLinesP(self.edges, rho=rho_acc, theta=theta_acc , threshold=threshold,
                                      lines=lines, minLineLength=minLineLength, maxLineGap=maxLineGap)
+        if self.lines is None or len(self.lines) == 0:
+            self.vlines = np.array([]); return
+        
         print('found {} lines'.format(len(self.lines)))
         self.vlines = []
         dth=45.
@@ -479,14 +531,15 @@ class HoughLinesFinder:
 
     def has_lines(self): return self.vlines is not None and len(self.vlines) > 0
         
-    def draw(self, img, color=(0,0,255)):
-        for line in self.lines:
-            x1,y1,x2,y2 = line.squeeze()
-            cv2.line(img,(x1,y1),(x2,y2),color,2)
-        for line in self.vlines:
-            x1,y1,x2,y2 = line.squeeze()
-            cv2.line(img,(x1,y1),(x2,y2),(255, 0, 0),2)
-        cv2.polylines(img, self.mask_be, isClosed=True, color=(0, 255, 255), thickness=2)
+    def draw(self, img, color=(0,0,255), draw_mask=True, draw_lines=False):
+        if draw_lines:
+            for line in self.lines:
+                x1,y1,x2,y2 = line.squeeze()
+                cv2.line(img,(x1,y1),(x2,y2),color,2)
+            for line in self.vlines:
+                x1,y1,x2,y2 = line.squeeze()
+                cv2.line(img,(x1,y1),(x2,y2),(255, 0, 0),2)
+        cv2.polylines(img, self.mask, isClosed=True, color=(0, 255, 255), thickness=2)
 
             
 def get_points_on_plane(rays, plane_n, plane_d):

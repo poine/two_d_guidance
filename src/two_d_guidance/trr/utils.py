@@ -62,7 +62,7 @@ class LaneModel:
     def get_y(self, x):
         return np.polyval(self.coefs, x)
 
-    def fit2(self, ctrs, ctrs_area, order=3):
+    def fit_all_contours(self, ctrs, order=3):
         sum_ctrs = np.concatenate(ctrs, axis=0)
         pts = sum_ctrs.squeeze()
         xs, ys = pts[:,0], pts[:,1]
@@ -74,7 +74,7 @@ class LaneModel:
         self.inliers_mask = np.full(len(ctrs), True)
         if self.valid:
             if len(ctrs) < 2:
-                self.fit2(ctrs, ctrs_area, order)
+                self.fit_all_contours(ctrs, order)
             else:
                 #self._plot(ctrs)
                 #pdb.set_trace()
@@ -83,10 +83,10 @@ class LaneModel:
                 #inliers_idx = res < np.float64(0.03)#np.median(res)
                 self.inliers_mask = self.res < 1.4*np.mean(self.res)
                 #print self.res, np.median(self.res), np.mean(self.res), self.inliers_mask
-                self.fit2(ctrs[self.inliers_mask], ctrs_area, order)
+                self.fit_all_contours(ctrs[self.inliers_mask], order)
         else:
-            #self.fit2(ctrs[np.argmax(ctrs_area)], None, order)
-            self.fit2(ctrs, ctrs_area, order)
+            #self.fit_all_contours(ctrs[np.argmax(ctrs_area)], order)
+            self.fit_all_contours(ctrs, order)
 
     def _plot(self, ctrs):
         for c in ctrs:

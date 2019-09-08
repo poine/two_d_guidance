@@ -20,7 +20,7 @@ import two_d_guidance.cfg.trr_vision_laneConfig
 
 class BirdEyePublisher(trr_rpu.ContourPublisher):
     def __init__(self, frame_id, be_param, topic='trr_vision/lane/bird_eye'):
-        trr_rpu.ContourPublisher.__init__(self, frame_id, topic, be_param.va_bf, rgba=(1.,0.,0.,1.))
+        trr_rpu.ContourPublisher.__init__(self, frame_id, topic, be_param.corners_be_blf, rgba=(1.,0.,0.,1.))
         
 '''
 
