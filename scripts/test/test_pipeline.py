@@ -95,4 +95,4 @@ if __name__ == '__main__':
         bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines
         #bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z
         img_topic = '/camera_road_front/image_raw'
-        test_on_bag(pipe, cam, bag_path, img_topic, sleep=True)
+        test_on_bag(pipe, cam, bag_path, img_topic, sleep=False)

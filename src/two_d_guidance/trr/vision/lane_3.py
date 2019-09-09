@@ -30,7 +30,7 @@ class Foo3Pipeline(trr_vu.Pipeline):
             _all_pts_be = np.array(_all_pts)
             _all_pts_lfp = self.bird_eye.unwarped_to_fp(cam, _all_pts_be)
             #print _all_pts.shape
-            self.lane_model.fit_all_contours(_all_pts_lfp.reshape((1, -1, 3)), None)
+            self.lane_model.fit_all_contours(_all_pts_lfp.reshape((1, -1, 3)))
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
