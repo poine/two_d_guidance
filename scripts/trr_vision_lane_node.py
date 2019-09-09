@@ -14,7 +14,8 @@ import two_d_guidance.trr.rospy_utils as trr_rpu
 # Different versions
 import two_d_guidance.trr.vision.lane_1 as trr_l1 # Contour detection in thresholded gray camera image
 import two_d_guidance.trr.vision.lane_2 as trr_l2 # Contour detection in thresholded gray camera image with bird eye
-import two_d_guidance.trr.vision.lane_3 as trr_l3 # In progress
+import two_d_guidance.trr.vision.lane_3 as trr_l3 # Contour detection in thresholded gray camera image with bird eye
+import two_d_guidance.trr.vision.lane_4 as trr_l4 # In progress
 
 import two_d_guidance.cfg.trr_vision_laneConfig
 
@@ -28,8 +29,8 @@ class BirdEyePublisher(trr_rpu.ContourPublisher):
 class Node(trr_rpu.TrrSimpleVisionPipeNode):
 
     def __init__(self):
-        pipe_type = 1
-        pipe_classes = [trr_l1.Contour1Pipeline, trr_l2.Contour2Pipeline, trr_l3.Foo3Pipeline]
+        pipe_type = 2
+        pipe_classes = [trr_l1.Contour1Pipeline, trr_l2.Contour2Pipeline, trr_l3.Contour3Pipeline ]
         trr_rpu.TrrSimpleVisionPipeNode.__init__(self, pipe_classes[pipe_type], self.pipe_cbk)
         try:
             robot_name = rospy.get_param('~robot_name', 'christine')#'caroline'

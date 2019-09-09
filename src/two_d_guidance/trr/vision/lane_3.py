@@ -99,7 +99,7 @@ class Contour3Pipeline(trr_vu.Pipeline):
     def _draw_HUD(self, debug_img):
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 0, 0), 2
         h1, c1, dy = 1., (220, 130, 120), 30
-        cv2.putText(debug_img, 'Lane#2', (20, 40), f, h, c, w)
+        cv2.putText(debug_img, 'Lane#3', (20, 40), f, h, c, w)
         self.draw_timing(debug_img, x0=360, y0=40)
         try:
             nb_valid_contours = len(self.contour_finder.valid_cnts)
