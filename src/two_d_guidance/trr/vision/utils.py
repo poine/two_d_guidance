@@ -481,17 +481,26 @@ class BinaryThresholder:
 
     def process_bgr(self, img):
         blue_img = img[:, :, 0]
-        res = []
-        for range in ((0, 50, 8), (50, 100, 22), (100, 200, 32), (200, 300, 60), (300, None, 100)):
-            width = range[2]
+        birdeye_mode = 0
+        if birdeye_mode:
+            width = 20
             cell = np.ones((width, width), np.uint8)
             kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (width * width)
-            mini_img = blue_img[range[0]:range[1], :]
-            bridge_img = cv2.filter2D(mini_img, -1, kernel)
-            bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
-            res.append(bridge_th_img)
-
-        self.threshold = cv2.vconcat(res)
+            bridge_img = cv2.filter2D(blue_img, -1, kernel)
+            self.threshold = cv2.adaptiveThreshold(bridge_blue_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
+        else:
+            res = []
+            for step in ((0, 50, 8), (50, 100, 22), (100, 200, 32), (200, 300, 60), (300, None, 100)):
+                width = step[2]
+                h = min(width, 50)
+                cell = np.ones((h, width), np.uint8)
+                kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (h * width)
+                mini_img = blue_img[step[0]:step[1], :]
+                bridge_img = cv2.filter2D(mini_img, -1, kernel)
+                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
+                res.append(bridge_th_img)
+            self.threshold = cv2.vconcat(res)
+            
         return self.threshold    
             
     def set_threshold(self, thresh): self.thresh_val = thresh
