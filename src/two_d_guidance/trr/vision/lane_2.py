@@ -85,6 +85,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
             self.cnts_be.append(cnt_be)
             cnt_lfp = self.bird_eye.points_imp_to_blf(cnt_imp)
+            print cnt_lfp.shape, cnt_lfp.dtype
             self.cnts_lfp.append(cnt_lfp)
         self.cnt_lfp_areas = [cv2.contourArea(_c) for _c in self.cnts_lfp]
         self.cnts_lfp = np.array(self.cnts_lfp)
@@ -153,8 +154,9 @@ class Contour2Pipeline(trr_vu.Pipeline):
             if self.use_single_contour:
                 debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, [self.cnt_max_be])
             else:
-                undistorted_img = cam.undistort_img2(self.img)
-                unwarped_img = self.bird_eye.process(undistorted_img)
+                undistorted_img = cam.undistort_img_map(self.img)
+                #unwarped_img = self.bird_eye.process(undistorted_img)
+                unwarped_img = self.bird_eye.unwarp_map(undistorted_img)
                 debug_img = self.bird_eye.draw_debug(cam, unwarped_img, self.lane_model, self.cnts_be)
         except AttributeError:
             debug_img = np.zeros((cam.h, cam.w, 3), dtype=np.uint8)

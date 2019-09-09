@@ -135,6 +135,20 @@ class BirdEyeTransformer:
         self.H, status = cv2.findHomography(srcPoints=va_corners_imp, dstPoints=va_corners_unwarped, method=cv2.RANSAC, ransacReprojThreshold=0.01)
         print('computed H unwarped: ({}/{} inliers)\n{}'.format( np.count_nonzero(status), len(va_corners_imp), self.H))
 
+        # make maps
+        self.unwrapped_xmap = np.zeros((self.h, self.w), np.float32)
+        self.unwrapped_ymap = np.zeros((self.h, self.w), np.float32)
+        _H = np.linalg.inv(self.H)
+        M11, M12, M13 = _H[0,:]
+        M21, M22, M23 = _H[1,:]
+        M31, M32, M33 = _H[2,:]
+        for y in range(self.h):
+            for x in range(self.w):
+                w = M31*float(x) + M32*float(y) + M33
+                w = 1./w if w != 0. else 0.
+                self.unwrapped_xmap[y,x] = (M11 * float(x) + M12 * float(y) + M13) * w
+                self.unwrapped_ymap[y,x] = (M21 * float(x) + M22 * float(y) + M23) * w
+
     # compute Homography from image plan to base link footprint
     def compute_H2(self, cam):
         print('### bird eye compute H for be_blf\narea:\n{}'.format(self.param.corners_be_blf))
@@ -192,6 +206,15 @@ class BirdEyeTransformer:
         self.unwarped_img = cv2.warpPerspective(img, self.H, (self.w, self.h), borderMode=cv2.BORDER_CONSTANT, borderValue=0)
         return self.unwarped_img
 
+    def unwarp_map(self, img):
+        self.unwarped_img = cv2.remap(img, self.unwrapped_xmap, self.unwrapped_ymap, cv2.INTER_LINEAR)
+        return self.unwarped_img
+
+    def undist_unwarp_map(self, img, cam): # FIXME do that with a single map
+        undistorted_img = cam.undistort_img_map(img)
+        self.unwarped_img = cv2.remap(undistorted_img, self.unwrapped_xmap, self.unwrapped_ymap, cv2.INTER_LINEAR)
+        return self.unwarped_img
+    
     def draw_debug(self, cam, img=None, lane_model=None, cnts_be=None, border_color=128, fill_color=(255, 0, 255)):
         if img is None:
             img = np.zeros((self.h, self.w, 3), dtype=np.float32) # black image in be coordinates

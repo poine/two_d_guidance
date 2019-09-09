@@ -8,6 +8,7 @@ import two_d_guidance.trr.vision.utils  as trr_vu
 import two_d_guidance.trr.vision.lane_1 as trr_l1
 import two_d_guidance.trr.vision.lane_2 as trr_l2
 import two_d_guidance.trr.vision.lane_3 as trr_l3
+import two_d_guidance.trr.vision.lane_4 as trr_l4
 
 def test_on_img(pipe, cam, img):
     pipe.process_image(img, cam, None, None)
@@ -64,8 +65,8 @@ if __name__ == '__main__':
         extr_cam_calib_path = '/home/poine/work/oscar/oscar/oscar_description/cfg/christine_cam_road_front_extr.yaml'
     cam = trr_vu.load_cam_from_files(intr_cam_calib_path, extr_cam_calib_path)
 
-    pipe_1, pipe_2, pipe_3 = range(3)
-    pipe_type = pipe_2
+    pipe_1, pipe_2, pipe_3, pipe_4 = range(4)
+    pipe_type = pipe_3
     if pipe_type == pipe_1:    # 154hz
         pipe = trr_l1.Contour1Pipeline(cam)
         pipe.thresholder.set_threshold(150)
@@ -76,7 +77,12 @@ if __name__ == '__main__':
         pipe.set_roi((0, 20), (cam.w, cam.h))
         pipe.display_mode = trr_l2.Contour2Pipeline.show_be
     elif pipe_type == pipe_3:
-        pipe = trr_l3.Foo3Pipeline(cam, trr_vu.ChristineBirdEyeParam())
+        pipe = trr_l3.Contour3Pipeline(cam, be_param)
+        pipe.thresholder.set_threshold(120)
+        pipe.set_roi((0, 20), (cam.w, cam.h))
+        pipe.display_mode = pipe.show_be
+    elif pipe_type == pipe_4:
+        pipe = trr_l4.Foo4Pipeline(cam, be_param)
         #pipe.thresholder.set_threshold(160)
         pipe.display_mode = pipe.show_contour
 
@@ -92,7 +98,7 @@ if __name__ == '__main__':
         #bag_path = '/home/poine/2019-07-08-16-37-38.bag' # pierrette
         #bag_path = '/home/poine/2019-07-15-19-01-30.bag'#'/home/poine/2019-07-11-18-08-11.bag' #2019-07-11-15-03-18.bag' # caroline
         #bag_path = '/home/poine/2019-08-30-12-04-21.bag' # caroline vedrines #2019-08-08-16-46-55.bag'
-        bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines
-        #bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z
+        #bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines
+        bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z
         img_topic = '/camera_road_front/image_raw'
         test_on_bag(pipe, cam, bag_path, img_topic, sleep=False)
