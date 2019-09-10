@@ -43,7 +43,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.img_gray = cv2.cvtColor(self.img_roi, cv2.COLOR_BGR2GRAY )
             self.thresholder.process(self.img_gray)
         else:
-            self.thresholder.process_bgr(self.img_roi)
+            self.thresholder.process_bgr(self.img_roi, False)
 
         ### masks...
         cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)

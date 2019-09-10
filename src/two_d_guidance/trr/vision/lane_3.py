@@ -18,29 +18,29 @@ class Contour3Pipeline(trr_vu.Pipeline):
         self.display_mode = Contour3Pipeline.show_none
         self.img = None
         
-    def init_masks(self): # FIXME, compute that from be params
-        y0, x1, x2, y3 = 81, 346, 452, 80
-        self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, 0], [x2,0], [self.cam.w, y3],  [self.cam.w, 0] ] )
-        self.be_mask_noroi = self.be_mask_roi + self.tl
-        y0, x1, y1, x2, y3 = 350, 150, self.cam.h-20, 600, 350
-        self.car_mask = np.array( [ [0, self.cam.h], [0, y0], [x1, y1], [x2,y1], [self.cam.w, y3],  [self.cam.w, self.cam.h] ] )
-        self.car_mask_roi = self.car_mask - self.tl
+    # def init_masks(self): # FIXME, compute that from be params
+    #     y0, x1, x2, y3 = 81, 346, 452, 80
+    #     self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, 0], [x2,0], [self.cam.w, y3],  [self.cam.w, 0] ] )
+    #     self.be_mask_noroi = self.be_mask_roi + self.tl
+    #     y0, x1, y1, x2, y3 = 350, 150, self.cam.h-20, 600, 350
+    #     self.car_mask = np.array( [ [0, self.cam.h], [0, y0], [x1, y1], [x2,y1], [self.cam.w, y3],  [self.cam.w, self.cam.h] ] )
+    #     self.car_mask_roi = self.car_mask - self.tl
 
     def set_roi(self, tl, br):
         print('roi: {} {}'.format(tl, br))
         self.tl, self.br = tl, br
         self.roi_h, self.roi_w = self.br[1]-self.tl[1], self.br[0]-self.tl[0]
         self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
-        self.init_masks()
+        #self.init_masks()
         
-    def _process_image(self, img, cam):
+    def _process_image(self, img, cam, use_fancy_thresh=True):
         self.img = img
         self.img_unwarped = self.bird_eye.undist_unwarp_map(img, cam)
-        if 1:
+        if not use_fancy_thresh:
             self.img_gray = cv2.cvtColor(self.img_unwarped, cv2.COLOR_BGR2GRAY )
             self.thresholder.process(self.img_gray)
         else:
-            self.thresholder.process_bgr(self.img_unwarped)
+            self.thresholder.process_bgr(self.img_unwarped, True)
 
         ### masks...
         #cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)

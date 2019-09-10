@@ -80,7 +80,7 @@ if __name__ == '__main__':
         pipe = trr_l3.Contour3Pipeline(cam, be_param)
         pipe.thresholder.set_threshold(120)
         pipe.set_roi((0, 20), (cam.w, cam.h))
-        pipe.display_mode = pipe.show_be
+        pipe.display_mode = pipe.show_thresh
     elif pipe_type == pipe_4:
         pipe = trr_l4.Foo4Pipeline(cam, be_param)
         #pipe.thresholder.set_threshold(160)
