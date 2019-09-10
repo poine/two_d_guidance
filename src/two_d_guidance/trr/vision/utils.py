@@ -509,17 +509,20 @@ class BinaryThresholder:
             cell = np.ones((width, width), np.uint8)
             kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (width * width)
             bridge_img = cv2.filter2D(blue_img, -1, kernel)
-            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
+            # Level -10 for inside, -15 for outside
+            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -10)
         else:
             res = []
-            for step in ((0, 50, 8), (50, 100, 22), (100, 200, 32), (200, 300, 60), (300, None, 100)):
+            # Calibration for christine
+            for step in ((0, 35, 8), (35, 70, 13), (70, 120, 22), (120, 200, 35), (200, 300, 50), (300, None, 70)):
                 width = step[2]
                 h = min(width, 50)
                 cell = np.ones((h, width), np.uint8)
                 kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (h * width)
                 mini_img = blue_img[step[0]:step[1], :]
                 bridge_img = cv2.filter2D(mini_img, -1, kernel)
-                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
+                # Level -10 for inside, -15 for outside
+                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -10)
                 res.append(bridge_th_img)
             self.threshold = cv2.vconcat(res)
             
