@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import time, math, numpy as np
+import os, time, math, numpy as np
 
 import cv2
 from matplotlib import pyplot as plt
@@ -37,6 +37,23 @@ def read_point(yaml_data_path):
         pts_world.append(_coords['world'])
         pts_name.append(_name)
     return pts_name, np.array(pts_img, dtype=np.float64), np.array(pts_world, dtype=np.float64)
+
+# Computes the bridge filtering. This code is speed optimized. Original code using filter2D is much slower:
+def bridge_filter(img, cell_width, cell_height):
+    smooth = cv2.boxFilter(img, cv2.CV_16S, (cell_width, cell_height))
+    half = smooth / 2
+    smooth[:, cell_width:-cell_width] -= half[:, 0:-2*cell_width] + half[:, 2*cell_width:]
+    # This code avoids to build half and divide by 2, but implies complex rewrite for the last part
+    #cv2.scaleAdd(smooth[:, 0:-2*cell_width] + smooth[:, 2*cell_width:], -0.5, smooth[:, cell_width:-cell_width], smooth[:, cell_width:-cell_width])
+    smooth[:, 0:cell_width] -= half[:, cell_width:2*cell_width]
+    smooth[:, -cell_width:] -= half[:, -2*cell_width:-cell_width]
+    for c in range(cell_width):
+        smooth[:, c] -= half[:, 0]
+        smooth[:, -c-1] -= half[:, -1]
+    smooth[smooth < 0] = 0
+    return np.uint8(smooth)
+
+
 
 class BirdEyeParam:
     def __init__(self, x0=0.6, dx=1.2, dy=1.2, w=1024):
@@ -126,28 +143,48 @@ class BirdEyeTransformer:
     def _img_point_in_camera_frustum(self, pts_img, cam): return np.logical_and(pts_img[:,0,0] > 0, pts_img[:,0,0] < cam.w)
 
     # compute Homography from image plan to be image (unwarped)
-    def compute_H(self, cam):
-        print('### bird eye compute H for be_img\narea:\n{}'.format(self.param.corners_be_blf))
-        va_corners_img  = cam.project(self.borders_isect_be_cam)
-        va_corners_imp  = cam.undistort_points(va_corners_img)
-        #print('corners imp\n{}'.format(va_corners_imp))
-        va_corners_unwarped = self.lfp_to_unwarped(cam, self.borders_isect_be_cam.squeeze())
-        self.H, status = cv2.findHomography(srcPoints=va_corners_imp, dstPoints=va_corners_unwarped, method=cv2.RANSAC, ransacReprojThreshold=0.01)
-        print('computed H unwarped: ({}/{} inliers)\n{}'.format( np.count_nonzero(status), len(va_corners_imp), self.H))
+    def compute_H(self, cam, precomp_path='/tmp/be_precomp'):
+        try:  # speedup startup by loading precomputed values if they exists
+            data =  np.load(precomp_path+'.npz')
+            print('found precomputed data in {}'.format(precomp_path))
+            self.H = data['H']
+            self.unwrapped_xmap = data['unwrapped_xmap']
+            self.unwrapped_ymap = data['unwrapped_ymap']
+            self.unwrap_undist_xmap_int = data['unwrap_undist_xmap']
+            self.unwrap_undist_ymap_int = data['unwrap_undist_ymap']
+        except IOError:  
+            print('precomputed data {} does not exist'.format(precomp_path))
+            va_corners_img  = cam.project(self.borders_isect_be_cam)
+            va_corners_imp  = cam.undistort_points(va_corners_img)
+            va_corners_unwarped = self.lfp_to_unwarped(cam, self.borders_isect_be_cam.squeeze())
+            self.H, status = cv2.findHomography(srcPoints=va_corners_imp, dstPoints=va_corners_unwarped, method=cv2.RANSAC, ransacReprojThreshold=0.01)
+            print('computed H unwarped: ({}/{} inliers)\n{}'.format( np.count_nonzero(status), len(va_corners_imp), self.H))
+            print('computing H maps')
+            # make homography maps
+            self.unwrapped_xmap = np.zeros((self.h, self.w), np.float32)
+            self.unwrapped_ymap = np.zeros((self.h, self.w), np.float32)
+            Hinv = np.linalg.inv(self.H)
+            for y in range(self.h):
+                for x in range(self.w):
+                    pt_be = np.array([[x], [y], [1]], dtype=np.float32)
+                    pt_imp = np.dot(Hinv, pt_be)
+                    pt_imp /= pt_imp[2]
+                    self.unwrapped_xmap[y,x], self.unwrapped_ymap[y,x] =  pt_imp[:2]
 
-        # make maps
-        self.unwrapped_xmap = np.zeros((self.h, self.w), np.float32)
-        self.unwrapped_ymap = np.zeros((self.h, self.w), np.float32)
-        _H = np.linalg.inv(self.H)
-        M11, M12, M13 = _H[0,:]
-        M21, M22, M23 = _H[1,:]
-        M31, M32, M33 = _H[2,:]
-        for y in range(self.h):
-            for x in range(self.w):
-                w = M31*float(x) + M32*float(y) + M33
-                w = 1./w if w != 0. else 0.
-                self.unwrapped_xmap[y,x] = (M11 * float(x) + M12 * float(y) + M13) * w
-                self.unwrapped_ymap[y,x] = (M21 * float(x) + M22 * float(y) + M23) * w
+            # make combined undistortion + homography maps
+            self.unwrap_undist_xmap = np.zeros((self.h, self.w), np.float32)
+            self.unwrap_undist_ymap = np.zeros((self.h, self.w), np.float32)
+            for y in range(self.h):
+                for x in range(self.w):
+                    pt_be = np.array([[x, y, 1]], dtype=np.float32).T
+                    pt_imp = np.dot(cam.inv_undist_K, np.dot(Hinv, pt_be))
+                    pt_imp /= pt_imp[2]
+                    pt_img = cv2.projectPoints(pt_imp.T, np.zeros(3), np.zeros(3), cam.K, cam.D)[0]
+                    self.unwrap_undist_xmap[y,x], self.unwrap_undist_ymap[y,x] = pt_img.squeeze()
+            self.unwrap_undist_xmap_int, self.unwrap_undist_ymap_int = cv2.convertMaps(self.unwrap_undist_xmap, self.unwrap_undist_ymap, cv2.CV_16SC2)
+            print('dome computing H maps, saving for reuse')
+            np.savez(precomp_path, H=self.H, unwrapped_xmap=self.unwrapped_xmap, unwrapped_ymap=self.unwrapped_ymap,
+                     unwrap_undist_xmap=self.unwrap_undist_xmap_int,  unwrap_undist_ymap=self.unwrap_undist_ymap_int)
 
     # compute Homography from image plan to base link footprint
     def compute_H2(self, cam):
@@ -159,21 +196,6 @@ class BirdEyeTransformer:
         self.H2, status = cv2.findHomography(srcPoints=va_corners_imp, dstPoints=self.borders_isect_be_cam, method=cv2.RANSAC, ransacReprojThreshold=0.01)
         print('computed H blf: ({}/{} inliers)\n{}'.format(np.count_nonzero(status), len(va_corners_imp), self.H2))
              
-        if 0:  # use corners of viewing area - fails is bird eye area not included in viewing area
-            self.va_img = cam.project(self.param.corners_be_blf)
-            self.va_img_undistorted = cam.undistort_points(self.va_img)
-            pts_src = self.va_img_undistorted.squeeze()
-            pts_dst = self.param.corners_be_blf
-            self.H2, status = cv2.findHomography(pts_src, pts_dst)
-        if 0: # make sure we only use points inside camera's frustum
-            #va_vert_blf = self.param.corners_be_blf
-            va_lines_blf = _lines_of_corners(self.param.corners_be_blf, 0.01)
-            va_lines_img = cam.project(va_lines_blf)
-            va_valid_idx =  self._img_point_in_camera_frustum(va_lines_img, cam)
-            va_lines_imp = cam.undistort_points(va_lines_img[va_valid_idx])
-            self.H2, status = cv2.findHomography(va_lines_imp, va_lines_blf[va_valid_idx], cv2.RANSAC, 0.00001)
-            nb_inliers = np.count_nonzero(status)
-            print('computed H blf: ({}/{} inliers)\n{}'.format(nb_inliers, len(va_lines_blf), self.H2))
         
     def plot_calibration(self, img_undistorted):
         pass
@@ -211,8 +233,10 @@ class BirdEyeTransformer:
         return self.unwarped_img
 
     def undist_unwarp_map(self, img, cam): # FIXME do that with a single map
-        undistorted_img = cam.undistort_img_map(img)
-        self.unwarped_img = cv2.remap(undistorted_img, self.unwrapped_xmap, self.unwrapped_ymap, cv2.INTER_LINEAR)
+        #undistorted_img = cam.undistort_img_map(img)
+        #self.unwarped_img = cv2.remap(undistorted_img, self.unwrapped_xmap, self.unwrapped_ymap, cv2.INTER_LINEAR)
+        #self.unwarped_img = cv2.remap(img, self.unwrap_undist_xmap, self.unwrap_undist_ymap, cv2.INTER_LINEAR)
+        self.unwarped_img = cv2.remap(img, self.unwrap_undist_xmap_int, self.unwrap_undist_ymap_int, cv2.INTER_LINEAR)
         return self.unwarped_img
     
     def draw_debug(self, cam, img=None, lane_model=None, cnts_be=None, border_color=128, fill_color=(255, 0, 255)):
@@ -229,7 +253,9 @@ class BirdEyeTransformer:
             self.draw_lane(cam, img, lane_model, lane_model.x_min, lane_model.x_max)
         return change_canvas(img, cam.h, cam.w)
 
-    def draw_lane(self, cam, img, lane_model, l0=0.6, l1=1.8, color=(0,128,0)):
+    def draw_lane(self, cam, img, lane_model, l0=None, l1=None, color=(0,128,0)):
+        if l0 is None:
+            l0, l1 = lane_model.x_min, lane_model.x_max 
         # Coordinates in local_floor_plane(aka base_link_footprint) frame
         xs = np.linspace(l0, l1, 20); ys = lane_model.get_y(xs)
         pts_lfp = np.array([[x, y, 0] for x, y in zip(xs, ys)])
@@ -506,9 +532,7 @@ class BinaryThresholder:
         blue_img = img[:, :, 0]
         if birdeye_mode:
             width = 20
-            cell = np.ones((width, width), np.uint8)
-            kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (width * width)
-            bridge_img = cv2.filter2D(blue_img, -1, kernel)
+            bridge_img = bridge_filter(blue_img, width, width)
             # Level -10 for inside, -15 for outside
             self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -10)
         else:
@@ -517,12 +541,10 @@ class BinaryThresholder:
             for step in ((0, 35, 8), (35, 70, 13), (70, 120, 22), (120, 200, 35), (200, 300, 50), (300, None, 70)):
                 width = step[2]
                 h = min(width, 50)
-                cell = np.ones((h, width), np.uint8)
-                kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (h * width)
                 mini_img = blue_img[step[0]:step[1], :]
-                bridge_img = cv2.filter2D(mini_img, -1, kernel)
+                bridge_img = bridge_filter(mini_img, width, h)
                 # Level -10 for inside, -15 for outside
-                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -10)
+                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
                 res.append(bridge_th_img)
             self.threshold = cv2.vconcat(res)
             
@@ -555,11 +577,11 @@ class HoughLinesFinder:
         self.use_mask=True
         
     def process(self, img, minval=100, maxval=200):
-        self.edges = cv2.Canny(img, minval, maxval, apertureSize=3)
-        if self.use_mask: cv2.fillPoly(self.edges, pts =self.mask, color=(128))
+        self.edges = cv2.Canny(img, minval, maxval, apertureSize=3, L2gradient=False)
+        if self.use_mask: cv2.fillPoly(self.edges, pts =self.mask, color=(0))
         rho_acc, theta_acc = 6, np.deg2rad(1)
         lines, threshold = 80, 30
-        minLineLength, maxLineGap = 200, 25
+        minLineLength, maxLineGap = 50, 25
         self.lines = cv2.HoughLinesP(self.edges, rho=rho_acc, theta=theta_acc , threshold=threshold,
                                      lines=lines, minLineLength=minLineLength, maxLineGap=maxLineGap)
         if self.lines is None or len(self.lines) == 0:
@@ -581,14 +603,15 @@ class HoughLinesFinder:
     def has_lines(self): return self.vlines is not None and len(self.vlines) > 0
         
     def draw(self, img, color=(0,0,255), draw_mask=True, draw_lines=False):
+        cv2.polylines(img, self.mask, isClosed=True, color=(0, 255, 255), thickness=2)
+        if self.lines is None: return
+        for line in self.lines:
+            x1,y1,x2,y2 = line.squeeze()
+            cv2.line(img,(x1,y1),(x2,y2),color,2)
         if draw_lines:
-            for line in self.lines:
-                x1,y1,x2,y2 = line.squeeze()
-                cv2.line(img,(x1,y1),(x2,y2),color,2)
             for line in self.vlines:
                 x1,y1,x2,y2 = line.squeeze()
                 cv2.line(img,(x1,y1),(x2,y2),(255, 0, 0),2)
-        cv2.polylines(img, self.mask, isClosed=True, color=(0, 255, 255), thickness=2)
 
             
 def get_points_on_plane(rays, plane_n, plane_d):

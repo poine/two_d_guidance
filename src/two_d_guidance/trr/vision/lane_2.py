@@ -10,6 +10,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def __init__(self, cam, be_param=trr_vu.BirdEyeParam(), use_single_contour=False, ctr_img_min_area=200):
         trr_vu.Pipeline.__init__(self)
         self.use_single_contour = use_single_contour
+        self.use_fancy_filtering = False
         self.cam = cam
         self.set_roi((0, 0), (cam.w, cam.h))
         self.thresholder = trr_vu.BinaryThresholder()
@@ -19,7 +20,6 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.display_mode = Contour2Pipeline.show_none
         self.img = None
         self.cnt_max_be = None
-        self.use_single_contour = use_single_contour
         
     def init_masks(self): # FIXME, compute that from be params
         y0, x1, x2, y3 = 81, 346, 452, 80
@@ -39,11 +39,11 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def _process_image(self, img, cam):
         self.img = img
         self.img_roi = img[self.roi]
-        if 1:
+        if self.use_fancy_filtering:
+            self.thresholder.process_bgr(self.img_roi, birdeye_mode=False)
+        else:
             self.img_gray = cv2.cvtColor(self.img_roi, cv2.COLOR_BGR2GRAY )
             self.thresholder.process(self.img_gray)
-        else:
-            self.thresholder.process_bgr(self.img_roi, False)
 
         ### masks...
         cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)

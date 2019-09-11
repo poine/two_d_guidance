@@ -9,6 +9,7 @@ class Contour3Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam, be_param=trr_vu.BirdEyeParam()):
         trr_vu.Pipeline.__init__(self)
+        self.use_fancy_filtering = False
         self.cam = cam
         self.set_roi((0, 0), (cam.w, cam.h))
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)
@@ -33,17 +34,17 @@ class Contour3Pipeline(trr_vu.Pipeline):
         self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
         #self.init_masks()
         
-    def _process_image(self, img, cam, use_fancy_thresh=True):
+    def _process_image(self, img, cam):
         self.img = img
         self.img_unwarped = self.bird_eye.undist_unwarp_map(img, cam)
-        if not use_fancy_thresh:
+        if self.use_fancy_filtering:
+            self.thresholder.process_bgr(self.img_unwarped, True)
+            ### masks...
+            cv2.fillPoly(self.thresholder.threshold, [self.bird_eye.mask_unwraped], color=0)
+        else:
             self.img_gray = cv2.cvtColor(self.img_unwarped, cv2.COLOR_BGR2GRAY )
             self.thresholder.process(self.img_gray)
-        else:
-            self.thresholder.process_bgr(self.img_unwarped, True)
 
-        ### masks...
-        #cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)
         
         self.contour_finder.process(self.thresholder.threshold)
         self.cnts_be = self.contour_finder.valid_cnts if self.contour_finder.valid_cnts is not None else []
@@ -70,8 +71,8 @@ class Contour3Pipeline(trr_vu.Pipeline):
             # masks
             #be_corners_img = self.bird_eye.param.corners_be_img.reshape((1, -1, 2)).astype(np.int)
             #cv2.polylines(debug_img, be_corners_img, isClosed=True, color=(0, 0, 255), thickness=2)
-            cv2.polylines(debug_img, [self.be_mask_noroi], isClosed=True, color=(0, 255, 255), thickness=2)
-            cv2.polylines(debug_img, [self.car_mask], isClosed=True, color=(0, 255, 255), thickness=2)
+            #cv2.polylines(debug_img, [self.be_mask_noroi], isClosed=True, color=(0, 255, 255), thickness=2)
+            #cv2.polylines(debug_img, [self.car_mask], isClosed=True, color=(0, 255, 255), thickness=2)
         
         elif self.display_mode == Contour3Pipeline.show_thresh:
             be_img =  cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)

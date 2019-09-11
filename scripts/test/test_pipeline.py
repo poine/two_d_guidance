@@ -73,32 +73,35 @@ if __name__ == '__main__':
         pipe.display_mode = pipe.show_contour
     elif pipe_type == pipe_2:  # now 200hz
         pipe = trr_l2.Contour2Pipeline(cam, be_param, use_single_contour=False, ctr_img_min_area=500); # 500
+        pipe.use_fancy_filtering = True
         pipe.thresholder.set_threshold(160)  # indoor: 120  outdoor: 160-170
         pipe.set_roi((0, 20), (cam.w, cam.h))
-        pipe.display_mode = trr_l2.Contour2Pipeline.show_be
+        pipe.display_mode = trr_l2.Contour2Pipeline.show_contour
     elif pipe_type == pipe_3:
         pipe = trr_l3.Contour3Pipeline(cam, be_param)
-        pipe.thresholder.set_threshold(120)
+        pipe.use_fancy_filtering = False
+        pipe.thresholder.set_threshold(160)
         pipe.set_roi((0, 20), (cam.w, cam.h))
-        pipe.display_mode = pipe.show_thresh
+        pipe.display_mode = pipe.show_contour
     elif pipe_type == pipe_4:
         pipe = trr_l4.Foo4Pipeline(cam, be_param)
         #pipe.thresholder.set_threshold(160)
-        pipe.display_mode = pipe.show_contour
+        pipe.display_mode = pipe.show_lines
 
     mode_img, mode_bag = range(2)
     mode = mode_bag
     if mode == mode_img:
         #img_path = '/home/poine/work/robot_data/jeanmarie/z_room_line_11.png'
         #img_path = '/home/poine/work/robot_data/caroline/line_z_02.png'
-        #img_path = '/home/poine/work/robot_data/christine/z_track/image_01.png'
-        img_path = '/home/poine/work/robot_data/christine/vedrines_track/frame_000000.png'
+        img_path = '/home/poine/work/robot_data/christine/z_track/image_01.png'
+        #img_path = '/home/poine/work/robot_data/christine/vedrines_track/frame_000000.png'
         test_on_img(pipe, cam, cv2.imread(img_path, cv2.IMREAD_COLOR))
     elif mode == mode_bag:
         #bag_path = '/home/poine/2019-07-08-16-37-38.bag' # pierrette
         #bag_path = '/home/poine/2019-07-15-19-01-30.bag'#'/home/poine/2019-07-11-18-08-11.bag' #2019-07-11-15-03-18.bag' # caroline
         #bag_path = '/home/poine/2019-08-30-12-04-21.bag' # caroline vedrines #2019-08-08-16-46-55.bag'
-        #bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines
-        bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z
+        #bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines failed
+        #bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z failed
+        bag_path = '/home/poine/2019-09-10-14-00-00.bag'  # Christine Vedrines OK
         img_topic = '/camera_road_front/image_raw'
-        test_on_bag(pipe, cam, bag_path, img_topic, sleep=False)
+        test_on_bag(pipe, cam, bag_path, img_topic, sleep=False, talk=False)
