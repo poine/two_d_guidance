@@ -38,13 +38,15 @@ def read_point(yaml_data_path):
         pts_name.append(_name)
     return pts_name, np.array(pts_img, dtype=np.float64), np.array(pts_world, dtype=np.float64)
 
-# Computes the bridge filtering. This code is speed optimized. Original code using filter2D is much slower:
+# Computes the bridge filtering. This code is speed optimized. Original code using filter2D is much slower (but much easier to understand):
+# KEEP        cell = np.ones((cell_height, cell_width), np.uint8)
+# KEEP        kernel = np.concatenate((cell * -0.5, cell, cell * -0.5), axis = 1) / (cell_height * cell_width)
+# KEEP        return cv2.filter2D(mini_img, -1, kernel)
 def bridge_filter(img, cell_width, cell_height):
     smooth = cv2.boxFilter(img, cv2.CV_16S, (cell_width, cell_height))
     half = smooth / 2
     smooth[:, cell_width:-cell_width] -= half[:, 0:-2*cell_width] + half[:, 2*cell_width:]
-    # This code avoids to build half and divide by 2, but implies complex rewrite for the last part
-    #cv2.scaleAdd(smooth[:, 0:-2*cell_width] + smooth[:, 2*cell_width:], -0.5, smooth[:, cell_width:-cell_width], smooth[:, cell_width:-cell_width])
+    # This code avoids to build half and divide by 2, but implies complex rewrite for the last part: cv2.scaleAdd(smooth[:, 0:-2*cell_width] + smooth[:, 2*cell_width:], -0.5, smooth[:, cell_width:-cell_width], smooth[:, cell_width:-cell_width])
     smooth[:, 0:cell_width] -= half[:, cell_width:2*cell_width]
     smooth[:, -cell_width:] -= half[:, -2*cell_width:-cell_width]
     for c in range(cell_width):
