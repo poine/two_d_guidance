@@ -100,7 +100,7 @@ class BirdEyeTransformer:
         self.cnt_fp = None
         self.unwarped_img = None
         
-    def set_param(self, be_param):
+    def set_param(self, cam, be_param):
         print('setting params x0 {} dx {} dy {}'.format(be_param.x0, be_param.dx, be_param.dy))
         self.param = be_param
         self.w, self.h = be_param.w, be_param.h
