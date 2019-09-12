@@ -53,7 +53,7 @@ class Contour3Pipeline(trr_vu.Pipeline):
         if self.display_mode == Contour3Pipeline.show_input:
             debug_img = self.img
             # roi
-            cv2.rectangle(debug_img, tuple(self.tl), tuple(self.br), color=(0, 0, 255), thickness=3)
+            #cv2.rectangle(debug_img, tuple(self.tl), tuple(self.br), color=(0, 0, 255), thickness=3)
             # masks
             #be_corners_img = self.bird_eye.param.corners_be_img.reshape((1, -1, 2)).astype(np.int)
             #cv2.polylines(debug_img, be_corners_img, isClosed=True, color=(0, 0, 255), thickness=2)
@@ -70,10 +70,6 @@ class Contour3Pipeline(trr_vu.Pipeline):
         elif self.display_mode == Contour3Pipeline.show_be:
             debug_img = self._draw_be(cam)
 
-        if self.display_mode not in [Contour3Pipeline.show_input, Contour3Pipeline.show_thresh, Contour3Pipeline.show_contour, Contour3Pipeline.show_be] :
-            debug_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.uint8)
-            debug_img[self.roi] = roi_img
-            
         if self.display_mode in [Contour3Pipeline.show_input]:
             if self.lane_model.is_valid():
                 self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max, color=(0,128,255))

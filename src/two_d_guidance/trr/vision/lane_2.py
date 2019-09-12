@@ -13,7 +13,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def __init__(self, cam, be_param=trr_vu.BirdEyeParam(), use_single_contour=False, ctr_img_min_area=200):
         trr_vu.Pipeline.__init__(self)
         self.use_single_contour = use_single_contour
-        self.use_fancy_filtering = False
+        self.use_fancy_filtering = True
         self.cam = cam
         self.set_roi((0, 0), (cam.w, cam.h))
         self.thresholder = trr_vu.BinaryThresholder()
@@ -118,7 +118,10 @@ class Contour2Pipeline(trr_vu.Pipeline):
 
         if self.display_mode not in [Contour2Pipeline.show_input, Contour2Pipeline.show_be] :
             debug_img = np.full((cam.h, cam.w, 3), border_color, dtype=np.uint8)
-            debug_img[self.roi] = roi_img
+            try:
+                debug_img[self.roi] = roi_img
+            except UnboundLocalError:  # race condition: dispay mode has been changed while we were drawing
+                pass
         if self.display_mode in [Contour2Pipeline.show_contour, Contour2Pipeline.show_input]:
             if self.lane_model.is_valid():
                 self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max, color=(0,128,255))
