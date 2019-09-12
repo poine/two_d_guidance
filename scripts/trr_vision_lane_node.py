@@ -36,7 +36,7 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
             robot_name = rospy.get_param('~robot_name', 'christine')#'caroline'
             param = trr_vu.NamedBirdEyeParam(robot_name)
             rospy.loginfo("  using {} bird eye".format(robot_name))
-            self.pipeline.bird_eye.set_param(param, self.cam)
+            self.pipeline.bird_eye.set_param(self.cam, param)
         except AttributeError: rospy.loginfo("  pipeline has no bird eye")
         
         roi_y_min = rospy.get_param('~roi_y_min', 0)

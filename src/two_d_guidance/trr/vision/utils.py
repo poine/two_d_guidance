@@ -96,7 +96,7 @@ def _lines_of_corners(corners, spacing):
 
 class BirdEyeTransformer:
     def __init__(self, cam, be_param):
-        self.set_param(be_param)
+        self.set_param(cam, be_param)
         self.cnt_fp = None
         self.unwarped_img = None
         
