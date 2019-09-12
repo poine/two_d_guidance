@@ -58,7 +58,7 @@ def bridge_filter(img, cell_width, cell_height):
 
 
 class BirdEyeParam:
-    def __init__(self, x0=0.6, dx=1.2, dy=1.2, w=1024):
+    def __init__(self, x0=0.3, dx=3., dy=2., w=640):
         # coordinates of viewing area on local floorplane in base_footprint frame
         self.x0, self.dx, self.dy = x0, dx, dy
         # coordinates of viewing area as a pixel array (unwarped)
@@ -97,9 +97,6 @@ def _lines_of_corners(corners, spacing):
 class BirdEyeTransformer:
     def __init__(self, cam, be_param):
         self.set_param(be_param)
-        self.compute_cam_viewing_area(cam)
-        self.compute_H(cam)
-        self.compute_H2(cam)
         self.cnt_fp = None
         self.unwarped_img = None
         
@@ -107,8 +104,11 @@ class BirdEyeTransformer:
         print('setting params x0 {} dx {} dy {}'.format(be_param.x0, be_param.dx, be_param.dy))
         self.param = be_param
         self.w, self.h = be_param.w, be_param.h
+        self._compute_cam_viewing_area(cam)
+        self._compute_H(cam)
+        self._compute_H2(cam)
 
-    def compute_cam_viewing_area(self, cam, max_dist=6):
+    def _compute_cam_viewing_area(self, cam, max_dist=6):
         # compute the contour of the intersection between camera frustum and floor plane
         corners_cam_img = np.array([[0., 0], [cam.w, 0], [cam.w, cam.h], [0, cam.h], [0, 0]])
         borders_cam_img = _lines_of_corners(corners_cam_img, spacing=1)
@@ -145,7 +145,7 @@ class BirdEyeTransformer:
     def _img_point_in_camera_frustum(self, pts_img, cam): return np.logical_and(pts_img[:,0,0] > 0, pts_img[:,0,0] < cam.w)
 
     # compute Homography from image plan to be image (unwarped)
-    def compute_H(self, cam, precomp_path='/tmp/be_precomp'):
+    def _compute_H(self, cam, precomp_path='/tmp/be_precomp'):
         try:  # speedup startup by loading precomputed values if they exists
             data =  np.load(precomp_path+'.npz')
             print('found precomputed data in {}'.format(precomp_path))
@@ -189,7 +189,7 @@ class BirdEyeTransformer:
                      unwrap_undist_xmap=self.unwrap_undist_xmap_int,  unwrap_undist_ymap=self.unwrap_undist_ymap_int)
 
     # compute Homography from image plan to base link footprint
-    def compute_H2(self, cam):
+    def _compute_H2(self, cam):
         print('### bird eye compute H for be_blf\narea:\n{}'.format(self.param.corners_be_blf))
         va_corners_img  = cam.project(self.borders_isect_be_cam)
         va_corners_imp  = cam.undistort_points(va_corners_img)

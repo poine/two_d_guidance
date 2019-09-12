@@ -19,21 +19,7 @@ class Contour3Pipeline(trr_vu.Pipeline):
         self.display_mode = Contour3Pipeline.show_none
         self.img = None
         
-    # def init_masks(self): # FIXME, compute that from be params
-    #     y0, x1, x2, y3 = 81, 346, 452, 80
-    #     self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, 0], [x2,0], [self.cam.w, y3],  [self.cam.w, 0] ] )
-    #     self.be_mask_noroi = self.be_mask_roi + self.tl
-    #     y0, x1, y1, x2, y3 = 350, 150, self.cam.h-20, 600, 350
-    #     self.car_mask = np.array( [ [0, self.cam.h], [0, y0], [x1, y1], [x2,y1], [self.cam.w, y3],  [self.cam.w, self.cam.h] ] )
-    #     self.car_mask_roi = self.car_mask - self.tl
-
-    def set_roi(self, tl, br):
-        print('roi: {} {}'.format(tl, br))
-        self.tl, self.br = tl, br
-        self.roi_h, self.roi_w = self.br[1]-self.tl[1], self.br[0]-self.tl[0]
-        self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
-        #self.init_masks()
-        
+    def set_roi(self, tl, br): pass
     def _process_image(self, img, cam):
         self.img = img
         self.img_unwarped = self.bird_eye.undist_unwarp_map(img, cam)
@@ -118,8 +104,8 @@ class Contour3Pipeline(trr_vu.Pipeline):
         debug_img = cv2.cvtColor(self.thresholder.threshold, cv2.COLOR_GRAY2BGR)
         self.contour_finder.draw2(debug_img, self.contour_finder.valid_cnts, self.lane_model.inliers_mask)
         #cv2.fillPoly(roi_img, [self.be_mask_roi, self.car_mask_roi], color=mask_color)
-        #if self.lane_model.is_valid():
-        #        self.lane_model.draw_on_cam_img(debug_img, cam, l0=self.lane_model.x_min, l1=self.lane_model.x_max, color=(0,128,255))
+        if self.lane_model.is_valid():
+            self.bird_eye.draw_lane(cam, debug_img, self.lane_model, color=(128,128,255))
         return debug_img
         
     def _draw_be(self, cam):

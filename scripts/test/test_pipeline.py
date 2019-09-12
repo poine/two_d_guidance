@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     pipe_1, pipe_2, pipe_3, pipe_4 = range(4)
     pipe_type = pipe_3
-    if pipe_type == pipe_1:    # 154hz
+    if pipe_type == pipe_2:    # 154hz
         pipe = trr_l1.Contour1Pipeline(cam)
         pipe.thresholder.set_threshold(150)
         pipe.display_mode = pipe.show_contour

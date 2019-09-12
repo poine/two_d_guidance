@@ -76,11 +76,6 @@ class LaneModel:
             if len(ctrs) < 2:
                 self.fit_all_contours(ctrs, order)
             else:
-                #self._plot(ctrs)
-                #pdb.set_trace()
-                #np.polyfit(c[:,0, 0], c[:,0, 1], order, full=True)
-                #pdb.set_trace()
-                #inliers_idx = res < np.float64(0.03)#np.median(res)
                 self.inliers_mask = self.res < 1.4*np.mean(self.res)
                 #print self.res, np.median(self.res), np.mean(self.res), self.inliers_mask
                 self.fit_all_contours(ctrs[self.inliers_mask], order)
