@@ -7,12 +7,13 @@ import pdb
 # TODO: use multiple contours rather than larger one?
 class Contour1Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
-    def __init__(self, cam):
+    def __init__(self, cam, robot_name):
         trr_vu.Pipeline.__init__(self)
         self.thresholder = trr_vu.BinaryThresholder()
         self.contour_finder = trr_vu.ContourFinder(min_area=500)
         self.floor_plane_injector = trr_vu.FloorPlaneInjector()
-        self.bird_eye = trr_vu.BirdEyeTransformer(cam,  trr_vu.BirdEyeParam(x0=-0.3, dx=3., dy=3., w=480))
+        be_param = trr_vu.NamedBirdEyeParam(robot_name)
+        self.bird_eye = trr_vu.BirdEyeTransformer(cam,  be_param)
         self.lane_model = trru.LaneModel()
         self.display_mode = Contour1Pipeline.show_contour
         self.img = None

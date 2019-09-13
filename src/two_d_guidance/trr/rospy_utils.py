@@ -85,7 +85,6 @@ class GuidanceStatusPublisher(SimplePublisher):
         msg = two_d_guidance.msg.FLGuidanceStatus()
         msg.guidance_mode = model.mode
         msg.poly = model.lane.coefs
-        #msg.poly = [0, 1, 0]
         msg.lookahead_dist = model.lookahead_dist
         msg.lookahead_time = model.lookahead_time
         msg.carrot_x, msg.carrot_y = model.carrot
@@ -155,8 +154,8 @@ class TrrStateEstimationPublisher(SimplePublisher):
         SimplePublisher.publish(self, msg)
 
 class TrrStateEstimationSubscriber(SimpleSubscriber):
-    def __init__(self, topic='trr_state_est/status', what='unkown'):
-        SimpleSubscriber.__init__(self, topic, two_d_guidance.msg.TrrStateEst, what)
+    def __init__(self, topic='trr_state_est/status', what='unkown', timeout=0.1, user_callback=None):
+        SimpleSubscriber.__init__(self, topic, two_d_guidance.msg.TrrStateEst, what, timeout, user_callback)
 
     def get(self):
         msg = SimpleSubscriber.get(self)
@@ -375,7 +374,7 @@ class TrrSimpleVisionPipeNode:
         self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(self.cam_names, fetch_extrinsics=True, world=self.ref_frame)
         self.cam = self.cam_sys.cameras[0]; self.cam.set_undistortion_param(alpha=1.)
 
-        self.pipeline = pipeline_class(self.cam)
+        self.pipeline = pipeline_class(self.cam, robot_name)
 
     def start(self): # TODO FIXME - make sure this can be started later
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=self.cam_names, cbk=self.on_image)

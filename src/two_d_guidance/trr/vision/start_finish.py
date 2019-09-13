@@ -7,9 +7,10 @@ import two_d_guidance.trr.utils as trru
 class StartFinishDetectPipeline(trr_vu.Pipeline):
     show_none, show_input, show_red_mask, show_green_mask, show_contour, show_be = range(6)
     
-    def __init__(self, cam, be_param=trr_vu.BirdEyeParam()):
+    def __init__(self, cam, robot_name):
         trr_vu.Pipeline.__init__(self)
         self.ss_dtc = trr_vu.StartFinishDetector()
+        be_param = trr_vu.NamedBirdEyeParam(robot_name)
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)
         self.img_bgr = None
         self.start_ctr_lfp, self.finish_ctr_lfp = None, None
@@ -111,8 +112,12 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
             #print(' ')
       
             
-
+            
     def draw_debug(self, cam, img_cam=None, border_color=128):
+        # we return a RGB8 image
+        return cv2.cvtColor(self.draw_debug_bgr(cam, img_cam, border_color), cv2.COLOR_BGR2RGB)
+
+    def draw_debug_bgr(self, cam, img_cam=None, border_color=128):
         if self.img_bgr is None: return np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         if self.display_mode == StartFinishDetectPipeline.show_input:
             out_img = self.img_bgr
@@ -131,8 +136,8 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
             if self.roi_h == roi_img_h and self.roi_w == roi_img_w:
                 out_img[self.roi] = roi_img
         if self.show_hud: self.draw_hud(out_img, cam)
-        # we return a RGB8 image
-        return cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB)
+        # we return a BGR8 image
+        return out_img
 
 
     def draw_hud(self, out_img, cam, y0=20, font_color=(0,255,255)):

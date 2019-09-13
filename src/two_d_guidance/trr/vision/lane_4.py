@@ -7,15 +7,18 @@ import pdb
 
 class Foo4Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_edges, show_lines, show_be = range(5)
-    def __init__(self, cam, be_param=trr_vu.BirdEyeParam()):
+    def __init__(self, cam, robot_name):
         trr_vu.Pipeline.__init__(self)
+        be_param = trr_vu.NamedBirdEyeParam(robot_name)
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)
         self.line_finder = trr_vu.HoughLinesFinder(self.bird_eye.mask_unwraped)
         self.lane_model = trr_u.LaneModel()
         self.img = None
         self.undistorted_img = None
         self.display_mode = Foo4Pipeline.show_be
-        
+
+    def set_roi(self, tl, br): pass
+         
     def _process_image(self, img, cam):
         self.img = img
         self.undistorted_img = cam.undistort_img_map(img)
@@ -40,7 +43,7 @@ class Foo4Pipeline(trr_vu.Pipeline):
         return cv2.cvtColor(self.draw_debug_bgr(cam, img_cam), cv2.COLOR_BGR2RGB)
     
     def draw_debug_bgr(self, cam, img_cam=None):
-        if self.img is None: return np.zeros((cam.h, cam.w, 3))
+        if self.img is None: return np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         if self.display_mode == Foo4Pipeline.show_input:
             debug_img = self.img
             #cv2.rectangle(debug_img, tuple(self.tl), tuple(self.br), color=(0, 0, 255), thickness=3)

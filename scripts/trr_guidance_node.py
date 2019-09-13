@@ -46,10 +46,10 @@ class Node(trr_rpu.PeriodicNode):
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
 
     def cfg_callback(self, config, level):
-        rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead_dist}/{lookahead_time}, vel_setpoint: {vel_sp}".format(**config))
+        rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead_dist}, vel_setpoint: {vel_sp}".format(**config))
         self.guidance.set_mode(config['guidance_mode'])
         self.guidance.lookaheads[0].set_dist(config['lookahead_dist'])
-        self.guidance.lookaheads[1].set_time(config['lookahead_time'])
+        #self.guidance.lookaheads[1].set_time(config['lookahead_time'])
         self.guidance.lookahead_mode = config['lookahead_mode']
         self.guidance.vel_ctl.sp = config['vel_sp']
         self.guidance.vel_ctl.k_curv = config['vel_k_curve']

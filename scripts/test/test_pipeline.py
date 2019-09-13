@@ -34,6 +34,7 @@ def test_on_bag(pipe, cam, bag_path, img_topic='/camera1/image_raw', sleep=False
             out_img = pipe.draw_debug_bgr(cam)
             cv2.imshow('out', out_img)
             cv2.waitKey(10)
+            #cv2.waitKey(0)
         last_img_t = img_t
         time_to_sleep = max(0., img_dt-pipe.last_processing_duration) if sleep else 0
         time.sleep(time_to_sleep)
@@ -78,11 +79,11 @@ if __name__ == '__main__':
         pipe.set_roi((0, 20), (cam.w, cam.h))
         pipe.display_mode = trr_l2.Contour2Pipeline.show_contour
     elif pipe_type == pipe_3:
-        pipe = trr_l3.Contour3Pipeline(cam, be_param)
+        pipe = trr_l3.Contour3Pipeline(cam, robot_names[robot])
         pipe.use_fancy_filtering = False
         pipe.thresholder.set_threshold(160)
         pipe.set_roi((0, 20), (cam.w, cam.h))
-        pipe.display_mode = pipe.show_contour
+        pipe.display_mode = pipe.show_be
     elif pipe_type == pipe_4:
         pipe = trr_l4.Foo4Pipeline(cam, be_param)
         #pipe.thresholder.set_threshold(160)
@@ -102,6 +103,11 @@ if __name__ == '__main__':
         #bag_path = '/home/poine/2019-08-30-12-04-21.bag' # caroline vedrines #2019-08-08-16-46-55.bag'
         #bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines failed
         #bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z failed
-        bag_path = '/home/poine/2019-09-10-14-00-00.bag'  # Christine Vedrines OK
+        #bag_path = '/home/poine/2019-09-10-14-00-00.bag'  # Christine Vedrines OK
+        bag_path = '/home/poine/2019-09-12-13-09-59.bag'   # auto gain/exp
+        #bag_path = '/home/poine/2019-09-12-13-12-23.bag'  # auto exp?
+        #bag_path = '/home/poine/2019-09-12-13-14-57.bag'  # auto gain?
+        #bag_path = '/home/poine/2019-09-12-13-16-55.bag'  #
+        #bag_path = '/home/poine/2019-09-12-13-19-53.bag'  # low blue
         img_topic = '/camera_road_front/image_raw'
-        test_on_bag(pipe, cam, bag_path, img_topic, sleep=False, talk=False)
+        test_on_bag(pipe, cam, bag_path, img_topic, sleep=True, talk=False)

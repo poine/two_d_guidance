@@ -425,7 +425,7 @@ class ColoredContourDetector:
             
             
     def draw(self, bgr_img, color=(255,0,0), fill_color=(255,255,0)):
-        self.bin_ctr_finder.draw(bgr_img, thickness=1, color=color, fill_color=fill_color)
+        self.bin_ctr_finder.draw(bgr_img, thickness=1, mc_border_color=color, mc_fill_color=fill_color)
         return bgr_img
 
 class ColoredMaskExtractor:
@@ -536,7 +536,7 @@ class BinaryThresholder:
             width = 20
             bridge_img = bridge_filter(blue_img, width, width)
             # Level -10 for inside, -15 for outside
-            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -10)
+            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -30)
         else:
             res = []
             # Calibration for christine

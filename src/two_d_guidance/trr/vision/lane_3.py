@@ -7,9 +7,10 @@ import pdb
 
 class Contour3Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
-    def __init__(self, cam, be_param=trr_vu.BirdEyeParam()):
+    def __init__(self, cam, robot_name):
         trr_vu.Pipeline.__init__(self)
         self.use_fancy_filtering = False
+        be_param = trr_vu.NamedBirdEyeParam(robot_name)
         self.cam = cam
         self.set_roi((0, 0), (cam.w, cam.h))
         self.bird_eye = trr_vu.BirdEyeTransformer(cam, be_param)

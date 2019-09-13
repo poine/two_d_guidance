@@ -10,11 +10,12 @@ import pdb
 
 class Contour2Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
-    def __init__(self, cam, be_param=trr_vu.BirdEyeParam(), use_single_contour=False, ctr_img_min_area=200):
+    def __init__(self, cam, robot_name, use_single_contour=False, ctr_img_min_area=200):
         trr_vu.Pipeline.__init__(self)
         self.use_single_contour = use_single_contour
         self.use_fancy_filtering = True
         self.cam = cam
+        be_param = trr_vu.NamedBirdEyeParam(robot_name)
         self.set_roi((0, 0), (cam.w, cam.h))
         self.thresholder = trr_vu.BinaryThresholder()
         self.contour_finder = trr_vu.ContourFinder(min_area=ctr_img_min_area)

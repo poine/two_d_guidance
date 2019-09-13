@@ -48,26 +48,28 @@ class VelCtl:
 class CstLookahead:
     def __init__(self, _d=0.4): self.d = _d
     def set_dist(self, _d): self.d = _d
-    def set_time(self, _t): pass
+    #def set_time(self, _t): pass
     def get_dist(self, _v): return self.d
 
-class TimeCstLookahead:
-    def __init__(self, _t=0.4): self.t = _t
+class AdaptiveLookahead:
+    def __init__(self):
+        self.v0, self.v1 = 1., 4.
+        self.d0, self.d1 = 0.6, 1.5
+        self.k =  (self.d1-self.d0)/(self.v1-self.v0)
     def set_dist(self, _d): pass
-    def set_time(self, _t): self.t = _t
+    def set_time(self, _t): pass #self.t = _t
     def get_dist(self, _v):
-        d1 = _v*self.t
-        if d1 < 0.5: d1=0.5
-        if d1 > 0.9: d1=0.9
-        return d1
+        if _v < self.v0:   return self.d0
+        elif _v > self.v1: return self.d1
+        else: return self.d0 + (_v-self.v0)*self.k
         
 class Guidance:
     mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
-    mode_lookahead_dist, mode_lookahead_time = range(2)
+    mode_lookahead_cst, mode_lookahead_adaptive = range(2)
     def __init__(self, lookahead=0.4, vel_sp=0.2, path_fname=None):
         self.set_mode(Guidance.mode_idle)
-        self.lookaheads = [CstLookahead(), TimeCstLookahead()]
-        self.lookahead_mode = Guidance.mode_lookahead_dist
+        self.lookaheads = [CstLookahead(), AdaptiveLookahead()]
+        self.lookahead_mode = Guidance.mode_lookahead_cst
         self.lookahead_dist = lookahead
         self.lookahead_time = 0.1
         self.lane = trr_u.LaneModel()
