@@ -94,7 +94,11 @@ class StateEstimator:
         self.path.report()
 
     def update_k_odom(self, v): print('k_odom {}'.format(v)); self.k_odom = v
-        
+
+    def initialize(self, s0):
+        self.sn = s0
+        self.idx_sn, _ = self.path.find_point_at_dist_from_idx(0, _d=self.sn)
+     
     def _update_s(self, ds):
         self.s += ds
         self.prev_sn = self.sn

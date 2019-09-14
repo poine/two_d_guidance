@@ -1,4 +1,4 @@
-import matplotlib, matplotlib.pyplot as plt
+import math, matplotlib, matplotlib.pyplot as plt
 
 '''
    Plotting
@@ -45,3 +45,20 @@ def savefig(filename):
         print('saving {}'.format(filename))
         plt.savefig(filename)
         
+def plot_in_grid(time, plots, ncol, figure=None, window_title="None", legend=None, filename=None,
+                 margins=(0.04, 0.08, 0.93, 0.96, 0.20, 0.34)):
+    nrow = math.ceil(len(plots)/float(ncol))
+    figsize = (10.24*ncol, 2.56*nrow)
+    figure = prepare_fig(figure, window_title, figsize=figsize, margins=margins)
+#    pdb.set_trace()
+    for i, p in enumerate(plots):
+        if p != None:
+            (title, ylab, data) = p
+            ax = figure.add_subplot(nrow, ncol, i+1)
+            ax.plot(time, data)
+            decorate(ax, title=title, ylab=ylab, xlab = 'seconds')
+    if legend!=None:
+        ax.legend(legend, loc='best')
+    savefig(filename)
+    return figure
+

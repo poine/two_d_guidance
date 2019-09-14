@@ -17,41 +17,64 @@ def test_on_img(pipe, cam, img):
     cv2.waitKey(0)
 
 
-def test_on_bag(pipe, cam, bag_path, img_topic='/camera1/image_raw', sleep=False, talk=False ):
+def test_on_bag(pipe, cam, bag_path, img_topic, odom_topic, sleep=False, talk=False, display=True):
     bag, bridge = rosbag.Bag(bag_path, "r"), cv_bridge.CvBridge()
     durations, last_img_t = [], None
-    lane_mod_coefs = []
-    for topic, msg, img_t in bag.read_messages(topics=[img_topic]):
-        img_dt = 0.01 if last_img_t is None else (img_t-last_img_t).to_sec()
-        # this has been settled - we consume bgr image ( same as opencv )
-        #cv_img = bridge.imgmsg_to_cv2(msg, "rgb8")
-        cv_img = bridge.imgmsg_to_cv2(msg, "bgr8")
-        pipe.process_image(cv_img, cam, msg.header.stamp, msg.header.seq)
-        lane_mod_coefs.append(pipe.lane_model.coefs)
-        durations.append(pipe.last_processing_duration)
-        if talk: print('{:.3f}s ({:.1f}hz)'.format(pipe.last_processing_duration, 1./pipe.last_processing_duration ))
-        if pipe.display_mode != pipe.show_none:
-            out_img = pipe.draw_debug_bgr(cam)
-            cv2.imshow('out', out_img)
-            cv2.waitKey(10)
-            #cv2.waitKey(0)
-        last_img_t = img_t
-        time_to_sleep = max(0., img_dt-pipe.last_processing_duration) if sleep else 0
-        time.sleep(time_to_sleep)
+    times, lane_mod_coefs = [], []
+    odom_times, odom_vlins, odom_vangs = [], [], []
+    for topic, msg, img_t in bag.read_messages(topics=[img_topic, odom_topic]):
+        if topic == img_topic:
+            img_dt = 0.01 if last_img_t is None else (img_t-last_img_t).to_sec()
+            cv_img = bridge.imgmsg_to_cv2(msg, "bgr8")
+            pipe.process_image(cv_img, cam, msg.header.stamp, msg.header.seq)
+            lane_mod_coefs.append(pipe.lane_model.coefs)
+            times.append(img_t.to_sec())
+            durations.append(pipe.last_processing_duration)
+            if talk: print('{:.3f}s ({:.1f}hz)'.format(pipe.last_processing_duration, 1./pipe.last_processing_duration ))
+            if pipe.display_mode != pipe.show_none:
+                out_img = pipe.draw_debug_bgr(cam)
+                cv2.imshow('pipe debug', out_img)
+                cv2.waitKey(10)
+                #cv2.waitKey(0)
+            last_img_t = img_t
+            time_to_sleep = max(0., img_dt-pipe.last_processing_duration) if sleep else 0
+            time.sleep(time_to_sleep)
+        elif topic == odom_topic:
+            odom_times.append(msg.header.stamp.to_sec())
+            odom_vlins.append(msg.twist.twist.linear.x)
+            odom_vangs.append(msg.twist.twist.angular.z)
         
     freqs = 1./np.array(durations); _mean, _std, _min, _max = np.mean(freqs), np.std(freqs), np.min(freqs), np.max(freqs)
     plt.hist(freqs); plt.xlabel('hz'); plt.legend(['mean {:.1f} std {:.1f}\n min {:.1f} max {:.1f}'.format(_mean, _std, _min, _max)])
 
     lane_mod_coefs = np.array(lane_mod_coefs)
+    times = np.array(times)
+
+    filename = '/tmp/pipe_run.npz'
+    print('saving run to {}'.format(filename))
+    np.savez(filename, times = times, lane_mod_coefs=lane_mod_coefs,
+             odom_times=odom_times, odom_vlins=odom_vlins, odom_vangs=odom_vangs)
+
+    plot_run(times, lane_mod_coefs)
+
+    
+    
+def plot_run(times, lane_mod_coefs):
     fig, axs = plt.subplots(4, 2)
     for i in range(4):
         axs[i, 0].plot(lane_mod_coefs[:,i])
         axs[i, 1].plot(lane_mod_coefs[:-1,i] - lane_mod_coefs[1:,i])
     plt.show()
 
+def test_load(filename='/tmp/pipe_run.npz'):
+    print('loading path from {}'.format(filename))
+    data =  np.load(filename)
+    times, lane_mod_coefs = data['times'], data['lane_mod_coefs']
+    plot_run(times, lane_mod_coefs)
+    
     
 if __name__ == '__main__':
-    
+    #test_load()
     robot_pierrette, robot_caroline, robot_christine = range(3)
     robot_names = ['pierrette', 'caroline', 'christine']
     robot = robot_christine
@@ -68,12 +91,12 @@ if __name__ == '__main__':
 
     pipe_1, pipe_2, pipe_3, pipe_4 = range(4)
     pipe_type = pipe_3
-    if pipe_type == pipe_2:    # 154hz
+    if pipe_type == pipe_1:    # 154hz
         pipe = trr_l1.Contour1Pipeline(cam)
         pipe.thresholder.set_threshold(150)
         pipe.display_mode = pipe.show_contour
     elif pipe_type == pipe_2:  # now 200hz
-        pipe = trr_l2.Contour2Pipeline(cam, be_param, use_single_contour=False, ctr_img_min_area=500); # 500
+        pipe = trr_l2.Contour2Pipeline(cam, robot_names[robot], use_single_contour=False, ctr_img_min_area=500); # 500
         pipe.use_fancy_filtering = True
         pipe.thresholder.set_threshold(160)  # indoor: 120  outdoor: 160-170
         pipe.set_roi((0, 20), (cam.w, cam.h))
@@ -104,10 +127,10 @@ if __name__ == '__main__':
         #bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines failed
         #bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z failed
         #bag_path = '/home/poine/2019-09-10-14-00-00.bag'  # Christine Vedrines OK
-        bag_path = '/home/poine/2019-09-12-13-09-59.bag'   # auto gain/exp
-        #bag_path = '/home/poine/2019-09-12-13-12-23.bag'  # auto exp?
-        #bag_path = '/home/poine/2019-09-12-13-14-57.bag'  # auto gain?
+        #bag_path = '/home/poine/2019-09-12-13-09-59.bag'   # auto gain/exp
+        #bag_path = '/home/poine/2019-09-12-13-12-23.bag'  # KO : auto exp?
+        bag_path = '/home/poine/2019-09-12-13-14-57.bag'  # auto gain?
         #bag_path = '/home/poine/2019-09-12-13-16-55.bag'  #
         #bag_path = '/home/poine/2019-09-12-13-19-53.bag'  # low blue
-        img_topic = '/camera_road_front/image_raw'
-        test_on_bag(pipe, cam, bag_path, img_topic, sleep=True, talk=False)
+        img_topic, odom_topic = '/camera_road_front/image_raw', '/oscar_ackermann_controller/odom'
+        test_on_bag(pipe, cam, bag_path, img_topic, odom_topic, sleep=False, talk=False)

@@ -5,9 +5,6 @@ import two_d_guidance.trr.utils as trr_u
 #import rospy # maybe not...
 import pdb
 
-# File "/home/poine/work/overlay_ws/src/two_d_guidance/src/two_d_guidance/trr/vision/lane_2.py", line 118, in draw_debug_bgr
-#    debug_img[self.roi] = roi_im
-
 class Contour2Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam, robot_name, use_single_contour=False, ctr_img_min_area=200):
