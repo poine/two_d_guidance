@@ -268,8 +268,8 @@ class ImgPublisher:
         self.image_pub = rospy.Publisher(img_topic, sensor_msgs.msg.Image, queue_size=1)
         self.bridge = cv_bridge.CvBridge()
         
-    def publish(self, producer, cam):
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(producer.draw_debug(cam), "rgb8"))
+    def publish(self, producer, cam, encoding="rgb8"):
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(producer.draw_debug(cam), encoding))
 
 class CompressedImgPublisher:
     def __init__(self, cam, img_topic):
@@ -364,8 +364,7 @@ class ContourPublisher:
 
 
 class TrrSimpleVisionPipeNode:
-    def __init__(self, pipeline_class, pipe_cbk=None, low_freq=10):
-        self.low_freq = low_freq
+    def __init__(self, pipeline_class, pipe_cbk=None):
         robot_name = rospy.get_param('~robot_name', '')
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
         self.cam_names = rospy.get_param('~cameras', prefix(robot_name, 'camera_road_front')).split(',')
@@ -376,7 +375,7 @@ class TrrSimpleVisionPipeNode:
 
         self.pipeline = pipeline_class(self.cam, robot_name)
 
-    def start(self): # TODO FIXME - make sure this can be started later
+    def start(self):
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=self.cam_names, cbk=self.on_image)
 
     # we get a bgr8 image as input
@@ -384,8 +383,8 @@ class TrrSimpleVisionPipeNode:
         self.pipeline.process_image(img_bgr, self.cam_sys.cameras[cam_idx], stamp, seq)
         if self.pipe_cbk is not None: self.pipe_cbk()
         
-    def run(self):
-        rate = rospy.Rate(self.low_freq)
+    def run(self, low_freq=10):
+        rate = rospy.Rate(low_freq)
         try:
             while not rospy.is_shutdown():
                 self.periodic()
