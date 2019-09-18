@@ -61,14 +61,6 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
             #self.publish_3Dmarkers()
         self.status_pub.publish(self.pipeline)
     
-    def run(self):
-        rate = rospy.Rate(self.low_freq)
-        try:
-            while not rospy.is_shutdown():
-                self.periodic()
-                rate.sleep()
-        except rospy.exceptions.ROSInterruptException:
-            pass
         
 def main(args):
     name = 'trr_vision_lane_node'
