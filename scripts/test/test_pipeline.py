@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import time, numpy as np, matplotlib.pyplot as plt, cv2
+import os, time, numpy as np, matplotlib.pyplot as plt, cv2
 import rosbag, cv_bridge
 import pdb
 
@@ -22,17 +22,20 @@ def test_on_bag(pipe, cam, bag_path, img_topic, odom_topic, sleep=False, talk=Fa
     durations, last_img_t = [], None
     times, lane_mod_coefs = [], []
     odom_times, odom_vlins, odom_vangs = [], [], []
+    img_idx = -1
     for topic, msg, img_t in bag.read_messages(topics=[img_topic, odom_topic]):
         if topic == img_topic:
+            img_idx += 1
             img_dt = 0.01 if last_img_t is None else (img_t-last_img_t).to_sec()
             cv_img = bridge.imgmsg_to_cv2(msg, "bgr8")
             pipe.process_image(cv_img, cam, msg.header.stamp, msg.header.seq)
             lane_mod_coefs.append(pipe.lane_model.coefs)
             times.append(img_t.to_sec())
             durations.append(pipe.last_processing_duration)
-            if talk: print('{:.3f}s ({:.1f}hz)'.format(pipe.last_processing_duration, 1./pipe.last_processing_duration ))
+            if talk: print('img {} {:.3f}s ({:.1f}hz)'.format(img_idx, pipe.last_processing_duration, 1./pipe.last_processing_duration ))
             if pipe.display_mode != pipe.show_none:
                 out_img = pipe.draw_debug_bgr(cam)
+                cv2.imshow('input', cv_img)
                 cv2.imshow('pipe debug', out_img)
                 cv2.waitKey(10)
                 #cv2.waitKey(0)
@@ -121,16 +124,26 @@ if __name__ == '__main__':
         #img_path = '/home/poine/work/robot_data/christine/vedrines_track/frame_000000.png'
         test_on_img(pipe, cam, cv2.imread(img_path, cv2.IMREAD_COLOR))
     elif mode == mode_bag:
-        #bag_path = '/home/poine/2019-07-08-16-37-38.bag' # pierrette
-        #bag_path = '/home/poine/2019-07-15-19-01-30.bag'#'/home/poine/2019-07-11-18-08-11.bag' #2019-07-11-15-03-18.bag' # caroline
-        #bag_path = '/home/poine/2019-08-30-12-04-21.bag' # caroline vedrines #2019-08-08-16-46-55.bag'
-        #bag_path = '/home/poine/2019-09-05-18-30-00.bag' # Christine vedrines failed
-        #bag_path = '/home/poine/2019-09-06-12-59-29.bag' # Christine Z failed
-        #bag_path = '/home/poine/2019-09-10-14-00-00.bag'  # Christine Vedrines OK
-        #bag_path = '/home/poine/2019-09-12-13-09-59.bag'   # auto gain/exp
-        #bag_path = '/home/poine/2019-09-12-13-12-23.bag'  # KO : auto exp?
-        bag_path = '/home/poine/2019-09-12-13-14-57.bag'  # auto gain?
-        #bag_path = '/home/poine/2019-09-12-13-16-55.bag'  #
-        #bag_path = '/home/poine/2019-09-12-13-19-53.bag'  # low blue
+        bag_dir = '/home/poine'
+        # bag_filename = '2019-07-08-16-37-38.bag' # pierrette
+        # bag_filename = '2019-07-11-15-03-18.bag' # caroline
+        # bag_filename = '2019-07-11-18-08-11.bag' # caroline
+        # bag_filename = '2019-07-15-19-01-30.bag' # caroline
+        # bag_filename = '2019-08-08-16-46-55.bag' # caroline vedrines
+        # bag_filename = '2019-08-30-12-04-21.bag' # caroline vedrines
+        # bag_filename = '2019-09-05-18-30-00.bag' # Christine vedrines failed
+        # bag_filename = '2019-09-06-12-59-29.bag' # Christine Z failed
+        # bag_filename = '2019-09-09-19-08-27.bag' # Christine Z
+        # bag_filename = '2019-09-10-14-00-00.bag' # Christine Vedrines 3 tours, nuageux
+        # Camera road + odom
+        #bag_filename = '2019-09-12-13-09-59.bag' # vedrines 1 tour, soleil haut, 1 ombre poteau, auto gain/exp
+        # bag_filename = '2019-09-12-13-12-23.bag' # idem, fail sur ombre, non auto gain, auto exp
+        bag_filename = '2019-09-12-13-14-57.bag' # idem, semi fail sur ombre, auto gain, exp mini
+        # bag_filename = '2019-09-12-13-16-55.bag' # idem, arret sur ombre, gain bleu a 0
+        # bag_filename = '2019-09-12-13-19-53.bag' # idem, ligne droite seule, vitesse 4
+        # Camera road + odom + imu
+        #bag_filename = '2019-09-16-18-40-00.bag' # Christine Vedrines 1 tour, ombres longues, vitesse constante 2.5
+        #bag_filename = '2019-09-16-18-43-00.bag' # Christine Vedrines, ombres longues, acceleration en lignes droites a 4 puis 5
         img_topic, odom_topic = '/camera_road_front/image_raw', '/oscar_ackermann_controller/odom'
+        bag_path = os.path.join(bag_dir, bag_filename)
         test_on_bag(pipe, cam, bag_path, img_topic, odom_topic, sleep=False, talk=False)

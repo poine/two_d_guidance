@@ -143,8 +143,7 @@ def plot_odom(odom_times, odom_vlins, odom_vangs, figure=None, window_title="Ref
 
         
 
-def get_vision_measurements(lane_mod_coefs, force_recompute=False, filename='/tmp/pipe_run.npz'):
-    filename = '/tmp/est_run.npz'
+def get_vision_measurements(lane_mod_coefs, force_recompute=False, filename='/tmp/est_run.npz'):
     if force_recompute:
         Cs, cs = compute_curvatures(lane_mod_coefs, 0.3, 1.5)
         print('saving est run to {}'.format(filename))
@@ -191,13 +190,13 @@ def test_vision_curvature(lane_coefs, idx):
     plot_frame(idx, lane_coefs, C, c)
     plt.show()
 
-def process_vision_log(filename='/tmp/pipe_run.npz'):
+def process_vision_log(vision_pipe_filename='/tmp/pipe_run.npz'):
     #path_fname = '/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz'
     path_fname = '/home/poine/work/overlay_ws/src/two_d_guidance/paths/vedrines/track_trr.npz'
     _path = trr_se.StateEstPath(path_fname)
     #plot_path(p)
-    print('loading vision log  from {}'.format(filename))
-    data =  np.load(filename)
+    print('loading vision log  from {}'.format(vision_pipe_filename))
+    data =  np.load(vision_pipe_filename)
     lane_times, lane_mod_coefs = data['times'], data['lane_mod_coefs']
     odom_times, odom_vlins, odom_vangs = data['odom_times'], data['odom_vlins'], data['odom_vangs']
 
@@ -214,7 +213,7 @@ def process_vision_log(filename='/tmp/pipe_run.npz'):
         #test_vision_curvature(lane_mod_coefs, 756)
         test_vision_curvature(lane_mod_coefs, 1300)
         plt.show()
-    Cs, cs = get_vision_measurements(lane_mod_coefs, force_recompute=True, filename='/tmp/pipe_run.npz')
+    Cs, cs = get_vision_measurements(lane_mod_coefs, force_recompute=True)
     if 0:
         plot_frames(0, len(lane_mod_coefs), lane_mod_coefs, Cs, cs)
     

@@ -36,10 +36,9 @@ class Contour3Pipeline(trr_vu.Pipeline):
         self.contour_finder.process(self.thresholder.threshold)
         self.cnts_be = self.contour_finder.valid_cnts if self.contour_finder.valid_cnts is not None else []
         self.cnts_lfp = [self.bird_eye.unwarped_to_fp(cam, _c_be)[:,:2].reshape((-1,1,2)).astype(np.float32) for _c_be in self.cnts_be]
-        self.cnt_lfp_areas = [cv2.contourArea(_c) for _c in self.cnts_lfp]
         self.cnts_lfp = np.array(self.cnts_lfp)
         if len(self.cnts_lfp) > 0:
-            self.lane_model.fit(self.cnts_lfp,  self.cnt_lfp_areas)
+            self.lane_model.fit(self.cnts_lfp)
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
@@ -93,8 +92,6 @@ class Contour3Pipeline(trr_vu.Pipeline):
         y0 = 120
         cv2.putText(debug_img, 'valid contours: {}'.format(nb_valid_contours), (20, y0), f, h1, c1, w)
         cv2.putText(debug_img, 'model: {} valid'.format('' if self.lane_model.is_valid() else 'not'), (20, y0+dy), f, h1, c1, w)
-        res = np.float('inf') if not self.lane_model.is_valid() else np.mean(self.lane_model.res)
-        cv2.putText(debug_img, 'residual: {:.4f}'.format(res), (20, y0+2*dy), f, h1, c1, w)
 
     
     def _draw_contour(self, cam, mask_color=(150, 150, 120)):

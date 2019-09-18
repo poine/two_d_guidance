@@ -133,15 +133,10 @@ class BirdEyeTransformer:
             self.mask_unwraped = self.lfp_to_unwarped2(cam, self.mask_blf).reshape((1,-1,2)).astype(np.int64)
             print self.mask_unwraped
         else:
-            y0, y1, y2 = 680, 940, 960
-            x1, x2, x3 = 250, 380, 640 
-            self.mask_unwraped = np.array([[(0, y0), (x1, y1), (x2, y1), (x3, y0), (x3, y2), (0, y2)]])
-        #print self.mask_unwraped.shape
-        #print self.mask_unwraped.dtype
+            y0, y1, y2, y3 = 700, 940, 960, 650
+            x1, x2, x3 = 260, 360, 640
+            self.mask_unwraped = np.array([[(0, y0), (x1, y1), (x2, y1), (x3, y3), (x3, y2), (0, y2)]])
 
-
-        
-        
     def _img_point_in_camera_frustum(self, pts_img, cam): return np.logical_and(pts_img[:,0,0] > 0, pts_img[:,0,0] < cam.w)
 
     # compute Homography from image plan to be image (unwarped)
@@ -364,24 +359,24 @@ class ContourFinder:
     
     def process(self, img):
         # detect contours
-        self.img2, self.cnts, hierarchy = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        self.img2, self.cnts, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
+        # TODO: remove cnt_max computing
+        # TODO: remove single_contour code
         self.cnt_max = None
         if self.cnts is not None and len(self.cnts) > 0:
+            # This reduce global computing time but may impact polyfit
+            #self.cnts = [cv2.approxPolyDP(c, 0.8, True) for c in self.cnts]
             # find contour with largest area
             self.cnt_max = max(self.cnts, key=cv2.contourArea)
             self.cnt_max_area = cv2.contourArea(self.cnt_max)
             if self.min_area is not None and self.cnt_max_area < self.min_area:
-               self.cnt_max, self.cnt_max_area = None, 0
+            
+                self.cnt_max, self.cnt_max_area = None, 0
             # find all contours with a sufficient area
             if not self.single_contour:
                 self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
                 self.valid_cnts_idx = self.cnt_areas > self.min_area
                 self.valid_cnts = np.array(self.cnts)[self.valid_cnts_idx]
-                # sort by area ? no, useless
-                if False:
-                    self.valid_cnt_areas = self.cnt_areas[self.valid_cnts_idx]
-                    self.valib_cnt_areas_order = np.argsort(self.valid_cnt_areas)
-                    self.valid_cnt_sorted = self.valid_cnts[self.valib_cnt_areas_order]
                
     def draw(self, img, mc_border_color=(255,0,0), thickness=3, fill=True, mc_fill_color=(255,0,0), draw_all=False,
              ac_fill_color=(0, 128, 128)):
@@ -536,7 +531,7 @@ class BinaryThresholder:
             width = 20
             bridge_img = bridge_filter(blue_img, width, width)
             # Level -10 for inside, -15 for outside
-            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -30)
+            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
         else:
             res = []
             # Calibration for christine
