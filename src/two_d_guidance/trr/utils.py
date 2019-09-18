@@ -85,9 +85,8 @@ class LaneModel:
         Origin is robot center
         """
         self.inliers_mask = np.full(len(ctrs), True)
-        self.inliers_mask = np.full(len(ctrs), True)
         if len(ctrs) < 2:
-             self.fit_all_contours(ctrs, order)
+            self.fit_all_contours(ctrs, order)
         else:
             all_min = [min(c[:, 0, 0]) for c in ctrs]
             all_max = [max(c[:, 0, 0]) for c in ctrs]
@@ -146,7 +145,7 @@ class LaneModel:
                     break
                 
             #all_moments = [cv2.moments(c) for c in ctrs]
-            #eccentricity = ((moments['mu20'] - moments['mu02'])*(moments['mu20'] - moments['mu02']) - 4*moments['mu11']*moments['mu11'])/((moments['mu20']  moments['mu02'])*(moments['mu20'] + moments['mu02']))
+            #eccentricity = ((moments['mu20'] - moments['mu02'])*(moments['mu20'] - moments['mu02']) - 4*moments['mu11']*moments['mu11'])/((moments['mu20'] + moments['mu02'])*(moments['mu20'] + moments['mu02']))
 
             self.fit_all_contours(selected, order)
 

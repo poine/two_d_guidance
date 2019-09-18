@@ -370,8 +370,8 @@ class ContourFinder:
             self.cnt_max = max(self.cnts, key=cv2.contourArea)
             self.cnt_max_area = cv2.contourArea(self.cnt_max)
             if self.min_area is not None and self.cnt_max_area < self.min_area:
-            
                 self.cnt_max, self.cnt_max_area = None, 0
+
             # find all contours with a sufficient area
             if not self.single_contour:
                 self.cnt_areas = np.array([cv2.contourArea(c) for c in self.cnts])
