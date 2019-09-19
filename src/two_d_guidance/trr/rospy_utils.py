@@ -112,12 +112,12 @@ class TrrStartFinishPublisher(SimplePublisher):
 
     def publish(self, pl):
         msg = two_d_guidance.msg.TrrStartFinish()
-        if pl.ss_dtc.sees_start():
-            for (x, y, z) in pl.start_ctr_lfp:
-               msg.start_points.append(msgPoint(x, y, z))
-        if pl.ss_dtc.sees_finish():
-            for (x, y, z) in pl.finish_ctr_lfp:
-               msg.finish_points.append(msgPoint(x, y, z))
+        # if pl.sfd.sees_start():
+        #     for (x, y, z) in pl.start_ctr_lfp:
+        #        msg.start_points.append(msgPoint(x, y, z))
+        # if pl.ss_dtc.sees_finish():
+        #     for (x, y, z) in pl.finish_ctr_lfp:
+        #        msg.finish_points.append(msgPoint(x, y, z))
         msg.dist_to_finish = pl.dist_to_finish
         msg.dist_to_start = pl.dist_to_start
         SimplePublisher.publish(self, msg)

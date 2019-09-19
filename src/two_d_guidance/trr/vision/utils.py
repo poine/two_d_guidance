@@ -497,42 +497,52 @@ def params_of_hsv_range(hsv_range):
 class StartFinishDetector:
     CTR_START, CTR_FINISH, CTR_NB = range(3)
     def __init__(self):
+        self.min_area = 3000
         self.colors = [hsv_green_range(hc=80, smin=65, vmin=70), hsv_red_range(hc=175)]
         self.masks = [None, None]
         self.detected = [False, False]
+        self.areas = [0, 0]
+        self.center_coords = [(np.float('inf'), np.float('inf')) for i in range(self.CTR_NB)]
 
-    def sees_start(self): return self.detected(self.CTR_START)
-    def sees_finish(self): return self.detected(self.CTR_FINISH)
+    def sees_start(self): return self.detected[self.CTR_START]
+    def sees_finish(self): return self.detected[self.CTR_FINISH]
     def get_mask(self, ctr_idx): return self.masks[ctr_idx]
-        
+    def get_center_coords(self, ctr_idx): return self.center_coords[ctr_idx]
+    
+    def set_hsv_range(self, color_idx, hsv_range): self.colors[color_idx] = hsv_range
+          
     def process_image(self, bgr_img):
-        hsv = cv2.cvtColor(bgr_img[110:, :], cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
 
         for idx, color_ranges in enumerate(self.colors):
-            self.masks[idx] = None
-            for color in color_ranges:
-                mask = cv2.inRange(hsv, color[0], color[1])
-                if self.masks[idx] is None:
-                    self.masks[idx] = mask
-                else:
-                    self.masks[idx] += mask #TODO check result size
+            # self.masks[idx] = None
+            # for color in color_ranges:
+            #     mask = cv2.inRange(hsv, color[0], color[1])
+            #     if self.masks[idx] is None:
+            #         self.masks[idx] = mask
+            #     else:
+            #         self.masks[idx] += mask #TODO check result size
+            self.masks[idx] = np.sum([cv2.inRange(hsv, _c[0], _c[1]) for _c in color_ranges], axis=0).astype(np.uint8)
                     
             moments = cv2.moments(self.masks[idx], True)
             m00 = moments['m00']
-            if m00 > 3000:
+            if m00 > self.min_area:
                 mu02, mu20, mu11 = map(moments.get, ['mu02', 'mu20', 'mu11'])
                 eccentricity = ((mu20 - mu02)*(mu20 - mu02) - 4*mu11*mu11)/((mu20 + mu02)*(mu20 + mu02))
                 self.detected[idx] = eccentricity > 0.8
             else:
                 self.detected[idx] = False
+            if self.detected[idx]:
+                self.center_coords[idx] = moments['m10']/m00, moments['m01']/m00
+                
             #print "area = " + str(m00) + "  e = " + str(eccentricity)
 
     def draw(self, bgr_img):
-        if self.masks[0] is None:
-            return None
+        if self.masks[self.CTR_START] is None or self.masks[self.CTR_FINISH] is None:
+            return np.zeros_like(bgr_img)
         blue = np.zeros(self.masks[0].shape, np.uint8)
-        red, green = self.masks
-        img = cv2.merge((blue, red, green))
+        green, red = self.masks
+        img = cv2.merge((blue, green, red))
         return img
 
 

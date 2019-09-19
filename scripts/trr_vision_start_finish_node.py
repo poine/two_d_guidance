@@ -78,7 +78,7 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
     def periodic(self):
         if self.pipeline.display_mode != self.pipeline.show_none:
             self.img_pub.publish(self.pipeline, self.cam)
-            self.marker_pub.publish(self.pipeline)
+            #self.marker_pub.publish(self.pipeline)
 
 
 
