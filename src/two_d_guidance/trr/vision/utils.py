@@ -397,8 +397,8 @@ class ContourFinder:
 
 class ColoredContourDetector:
     def __init__(self, hsv_range, min_area=None, gray_tresh=150):
-        self.mask_extractor = ColoredMaskExtractor(hsv_range)
-        #self.mask_extractor = ColoredAndLightMaskExtractor(hsv_range)
+        #self.mask_extractor = ColoredMaskExtractor(hsv_range)
+        self.mask_extractor = ColoredAndLightMaskExtractor(hsv_range)
         self.bin_ctr_finder = ContourFinder(min_area)
 
     def set_hsv_range(self, hsv_range):
