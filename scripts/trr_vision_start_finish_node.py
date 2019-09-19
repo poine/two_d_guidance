@@ -35,24 +35,40 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         #self.img_pub = trr_rpu.ImgPublisher(self.cam, '/trr_vision/start_finish/image_debug')
         self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/start_finish/image_debug')
         self.marker_pub = MarkerPublisher(self.ref_frame)
-        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_start_finishConfig, self.cfg_callback)
 
-        roi_y_min = rospy.get_param('~roi_y_min', 0)
-        tl, br = (0, roi_y_min), (self.cam.w, self.cam.h)
+        rospy.loginfo("  ### Setting values from param server")
+        roi_yt = rospy.get_param('~roi_yt', 0)
+        tl, br = (0, roi_yt), (self.cam.w, self.cam.h)
         self.pipeline.set_roi(tl, br) 
 
+        self.mask_param_names = ['_hc', '_hs', '_smin', '_smax', '_vmin', '_vmax']
+        self.green_mask_params = [rospy.get_param('~g'+_p) for _p in self.mask_param_names] + [0]
+        self.red_mask_params = [rospy.get_param('~r'+_p) for _p in self.mask_param_names] + [0]
+        self.pipeline.set_green_mask_params(*self.green_mask_params)
+        self.pipeline.set_red_mask_params(*self.red_mask_params)
+        rospy.loginfo('green mask params {}'.format(self.green_mask_params))
+        rospy.loginfo('red mask params {}'.format(self.red_mask_params))
+        
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_start_finishConfig, self.cfg_callback)
+       
         # start image subscription only here
         self.start()
 
     def cfg_callback(self, cfg, level):
-        rospy.loginfo("  Reconfigure Request:")
+        rospy.loginfo("  Reconfigure Request(level {}):".format(level))
         #print cfg, level
-        self.pipeline.set_debug_display(cfg['display_mode'], cfg['show_hud'])
-        self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax, cfg.g_gthr)
-        self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax, cfg.r_gthr)
-        yt, xbr, ybr = cfg.roi_yt, self.cam.w, self.cam.h
-        tl, br = (0, yt), (xbr, ybr)
-        self.pipeline.set_roi(tl, br)
+        if level == -1: # seems to be the case on first call (default values)
+            for _p, _v in zip(self.mask_param_names, self.red_mask_params):
+                cfg['r'+_p] = _v
+            for _p, _v in zip(self.mask_param_names, self.green_mask_params):
+                cfg['g'+_p] = _v
+        else: # subsequent calls (GUI has modified a parameter)
+            self.pipeline.set_debug_display(cfg['display_mode'], cfg['show_hud'])
+            self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax, cfg.g_gthr)
+            self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax, cfg.r_gthr)
+            yt, xbr, ybr = cfg.roi_yt, self.cam.w, self.cam.h
+            tl, br = (0, yt), (xbr, ybr)
+            self.pipeline.set_roi(tl, br)
         
         return cfg
     
@@ -69,7 +85,7 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
 def main(args):
     name = 'trr_vision_start_finish_node'
     rospy.init_node(name)
-    rospy.loginfo('{name} starting')
+    rospy.loginfo('{} starting'.format(name))
     rospy.loginfo('  using opencv version {}'.format(cv2.__version__))
     Node().run()
 

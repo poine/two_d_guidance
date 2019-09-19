@@ -405,6 +405,8 @@ class ColoredContourDetector:
         self.mask_extractor.set_hsv_range(hsv_range)
     def set_gray_threshold(self, v): 
         self.mask_extractor.set_threshold(v)
+
+    def get_hsv_range(self): return self.mask_extractor.get_hsv_range()
         
     def has_contour(self): return self.bin_ctr_finder.has_contour()
     def get_contour(self): return self.bin_ctr_finder.get_contour()
@@ -431,6 +433,8 @@ class ColoredMaskExtractor:
     def set_hsv_range(self, hsv_range):
         self.hsv_range = hsv_range
 
+    def get_hsv_range(self): return self.hsv_range
+        
     def process_hsv_image(self, hsv_img, img_gray):
         masks = [cv2.inRange(hsv_img, hsv_min, hsv_max) for (hsv_min, hsv_max) in self.hsv_range]
         self.mask = np.sum(masks, axis=0).astype(np.uint8)
@@ -481,7 +485,14 @@ def hsv_range(hcenter, hsens, smin, smax, vmin, vmax):
     else:
         ranges.append([np.array([hmin, smin, vmin]), np.array([hmax, smax, vmax])])
     return ranges
+#
+# converts hsv range [(hmin, smin, vmin), (hmax, smax, vmax)] to (hcenter, hsens, smin, smax, vmin, vmax)
+#
+def params_of_hsv_range(hsv_range):
+    pass
     
+
+
 
 class StartFinishDetector:
     CTR_START, CTR_FINISH, CTR_NB = range(3)

@@ -27,9 +27,16 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
         self.ss_dtc.green_ccf.set_gray_threshold(gray_thr)
 
     def set_red_mask_params(self, hc, hs, smin, smax, vmin, vmax, gray_thr):
+        param_txt = '{} {} / {} {} / {} {} / {}'.format(hc, hs, smin, smax, vmin, vmax, gray_thr)
+        print('StartFinishDetectPipeline::set_red_mask_params: {}'.format(param_txt))
         self.ss_dtc.red_ccf.set_hsv_range(trr_vu.hsv_range(hc, hs, smin, smax, vmin, vmax))
         self.ss_dtc.red_ccf.set_gray_threshold(gray_thr)
 
+
+    def get_red_mask_params(self):
+        return self.ss_dtc.red_ccf.get_hsv_range()
+
+        
     def set_roi(self, tl, br):
         print('roi: {} {}'.format(tl, br))
         self.roi_tl, self.roi_br = tl, br
