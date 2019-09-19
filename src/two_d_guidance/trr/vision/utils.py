@@ -463,27 +463,27 @@ def hsv_red_range(hc=0, hsens=10, smin=100, smax=255, vmin=30, vmax=255):
     red_range = hsv_range(hc, hsens, smin, smax, vmin, vmax)
     return red_range
 # Yellow is centered on h=30
-def hsv_yellow_range(hsens=10, smin=100, smax=255, vmin=100, vmax=255):
-    return hsv_range(30, hsens, smin, smax, vmin, vmax)
+def hsv_yellow_range(hc=30, hsens=10, smin=100, smax=255, vmin=100, vmax=255):
+    return hsv_range(hc, hsens, smin, smax, vmin, vmax)
 # Green is centered on h=60
-def hsv_green_range(hsens=10, smin=100, smax=255, vmin=100, vmax=255):
-    return hsv_range(60, hsens, smin, smax, vmin, vmax)
+def hsv_green_range(hc=60, hsens=10, smin=100, smax=255, vmin=100, vmax=255):
+    return hsv_range(hc, hsens, smin, smax, vmin, vmax)
 # Blue is centered on h=110
-def hsv_blue_range(hsens=10, smin=50, smax=255, vmin=50, vmax=255):
-    return hsv_range(110, hsens, smin, smax, vmin, vmax)
+def hsv_blue_range(hc=110, hsens=10, smin=50, smax=255, vmin=50, vmax=255):
+    return hsv_range(hc, hsens, smin, smax, vmin, vmax)
 
 def hsv_range(hcenter, hsens, smin, smax, vmin, vmax):
     # compute hsv range, wrap around 180 if needed (returns bottom and top range in this case)
     hmin, hmax = hcenter-hsens, hcenter+hsens
     ranges = []
     if hmin < 0:
-        ranges.append([np.array([0, smin, vmin]), np.array([hmax, smax, vmax])])
-        ranges.append([np.array([hmin+180, smin, vmin]), np.array([180, smax, vmax])])
+        ranges.append([np.array([0, smin, vmin],np.uint8), np.array([hmax, smax, vmax],np.uint8)])
+        ranges.append([np.array([hmin+180, smin, vmin],np.uint8), np.array([180, smax, vmax],np.uint8)])
     elif hmax > 180:
-        ranges.append([np.array([0, smin, vmin]),    np.array([hmax-180, smax, vmax])])
-        ranges.append([np.array([hmin, smin, vmin]), np.array([180, smax, vmax])])
+        ranges.append([np.array([0, smin, vmin],np.uint8),    np.array([hmax-180, smax, vmax],np.uint8)])
+        ranges.append([np.array([hmin, smin, vmin],np.uint8), np.array([180, smax, vmax],np.uint8)])
     else:
-        ranges.append([np.array([hmin, smin, vmin]), np.array([hmax, smax, vmax])])
+        ranges.append([np.array([hmin, smin, vmin],np.uint8), np.array([hmax, smax, vmax],np.uint8)])
     return ranges
 #
 # converts hsv range [(hmin, smin, vmin), (hmax, smax, vmax)] to (hcenter, hsens, smin, smax, vmin, vmax)
@@ -497,28 +497,43 @@ def params_of_hsv_range(hsv_range):
 class StartFinishDetector:
     CTR_START, CTR_FINISH, CTR_NB = range(3)
     def __init__(self):
-        self.green_ccf = ColoredContourDetector(hsv_green_range(), min_area=100)
-        self.red_ccf = ColoredContourDetector(hsv_red_range(), min_area=100)
-        self.ccfs = [self.green_ccf, self.red_ccf]
+        self.colors = [hsv_green_range(hc=80, smin=65, vmin=70), hsv_red_range(hc=175)]
+        self.masks = [None, None]
+        self.detected = [False, False]
 
-    def sees_ctr(self, ctr_idx): return self.ccfs[ctr_idx].has_contour()
-    def sees_start(self): return self.sees_ctr(self.CTR_START)
-    def sees_finish(self): return self.sees_ctr(self.CTR_FINISH)
-    def get_contour(self, ctr_idx): return self.ccfs[ctr_idx].get_contour()
+    def sees_start(self): return self.detected(self.CTR_START)
+    def sees_finish(self): return self.detected(self.CTR_FINISH)
+    def get_mask(self, ctr_idx): return self.masks[ctr_idx]
         
     def process_image(self, bgr_img):
-        hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
-        gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-        for ccf in self.ccfs:
-            ccf.process_hsv_image(hsv, gray)
- 
+        hsv = cv2.cvtColor(bgr_img[110:, :], cv2.COLOR_BGR2HSV)
+
+        for idx, color_ranges in enumerate(self.colors):
+            self.masks[idx] = None
+            for color in color_ranges:
+                mask = cv2.inRange(hsv, color[0], color[1])
+                if self.masks[idx] is None:
+                    self.masks[idx] = mask
+                else:
+                    self.masks[idx] += mask #TODO check result size
+                    
+            moments = cv2.moments(self.masks[idx], True)
+            m00 = moments['m00']
+            if m00 > 3000:
+                mu02, mu20, mu11 = map(moments.get, ['mu02', 'mu20', 'mu11'])
+                eccentricity = ((mu20 - mu02)*(mu20 - mu02) - 4*mu11*mu11)/((mu20 + mu02)*(mu20 + mu02))
+                self.detected[idx] = eccentricity > 0.8
+            else:
+                self.detected[idx] = False
+            #print "area = " + str(m00) + "  e = " + str(eccentricity)
+
     def draw(self, bgr_img):
-        gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-        bgr_img2 = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
-        fill_colors = [(0, 255,0), (0,0,255)]
-        for ccf, fill_color in zip(self.ccfs, fill_colors):
-            ccf.draw(bgr_img2, color=(155, 155, 0), fill_color=fill_color)
-        return bgr_img2
+        if self.masks[0] is None:
+            return None
+        blue = np.zeros(self.masks[0].shape, np.uint8)
+        red, green = self.masks
+        img = cv2.merge((blue, red, green))
+        return img
 
 
 class BinaryThresholder:
