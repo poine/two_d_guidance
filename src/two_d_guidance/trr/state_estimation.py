@@ -5,41 +5,42 @@ import math, numpy as np
 import rospy, rospkg
 
 import two_d_guidance as tdg
+import two_d_guidance.trr.utils as trr_u
 
 
 #
 # This is a specialized version of a path including start and finish landmarks
 #
-class StateEstPath(tdg.path.Path):
-    LM_START, LM_FINISH, LM_NB = range(3)
-    lm_names = ['start', 'finish']
-    #def __init__(self, path_filename, xstart=1.21, xfinish=0.86):
-    def __init__(self, path_filename, xstart=0, xfinish=16.66): # vedrines
-        tdg.path.Path.__init__(self, load=path_filename)
-        self.len = self.dists[-1] - self.dists[0]
-        # start is 1.25m before center of straight line
-        self.lm_start_idx, self.lm_start_point = self.find_point_at_dist_from_idx(0, _d=self.len-xstart)
-        self.lm_start_s = self.dists[self.lm_start_idx]
-        # finish is 1.25m after center of straight line
-        self.lm_finish_idx, self.lm_finish_point = self.find_point_at_dist_from_idx(0, _d=xfinish)
-        self.lm_finish_s = self.dists[self.lm_finish_idx]
-        #self.lm_s = [self.len-1.25, 1.25] # sim
-        #self.lm_s = [self.len-1.21, 0.86] # real
-        self.lm_s = [0., 16.66] # vedrines
-        self.lm_idx, self.lm_points = [], []
-        for _lm_s in self.lm_s:
-            _i, _p = self.find_point_at_dist_from_idx(0, _d=_lm_s)
-            self.lm_idx.append(_i) 
-            self.lm_points.append(_p) 
+# class StateEstPath(tdg.path.Path):
+#     LM_START, LM_FINISH, LM_NB = range(3)
+#     lm_names = ['start', 'finish']
+#     #def __init__(self, path_filename, xstart=1.21, xfinish=0.86):
+#     def __init__(self, path_filename, xstart=0, xfinish=16.66): # vedrines
+#         tdg.path.Path.__init__(self, load=path_filename)
+#         self.len = self.dists[-1] - self.dists[0]
+#         # start is 1.25m before center of straight line
+#         self.lm_start_idx, self.lm_start_point = self.find_point_at_dist_from_idx(0, _d=self.len-xstart)
+#         self.lm_start_s = self.dists[self.lm_start_idx]
+#         # finish is 1.25m after center of straight line
+#         self.lm_finish_idx, self.lm_finish_point = self.find_point_at_dist_from_idx(0, _d=xfinish)
+#         self.lm_finish_s = self.dists[self.lm_finish_idx]
+#         #self.lm_s = [self.len-1.25, 1.25] # sim
+#         #self.lm_s = [self.len-1.21, 0.86] # real
+#         self.lm_s = [0., 16.66] # vedrines
+#         self.lm_idx, self.lm_points = [], []
+#         for _lm_s in self.lm_s:
+#             _i, _p = self.find_point_at_dist_from_idx(0, _d=_lm_s)
+#             self.lm_idx.append(_i) 
+#             self.lm_points.append(_p) 
         
 
         
-    def report(self):
-        rospy.loginfo(' path len {:.2f}'.format(self.len))
-        rospy.loginfo(' path start {} (dist {:.2f}) '.format(self.points[0], self.dists[0]))
-        rospy.loginfo(' path finish {}(dist {:.2f})'.format(self.points[-1], self.dists[-1]))
-        rospy.loginfo('  lm_start idx {} pos {} dist {:.2f}'.format(self.lm_start_idx, self.lm_start_point, self.lm_start_s))
-        rospy.loginfo('  lm_finish idx {} pos {} dist {:.2f}'.format(self.lm_finish_idx, self.lm_finish_point, self.lm_finish_s))
+#     def report(self):
+#         rospy.loginfo(' path len {:.2f}'.format(self.len))
+#         rospy.loginfo(' path start {} (dist {:.2f}) '.format(self.points[0], self.dists[0]))
+#         rospy.loginfo(' path finish {}(dist {:.2f})'.format(self.points[-1], self.dists[-1]))
+#         rospy.loginfo('  lm_start idx {} pos {} dist {:.2f}'.format(self.lm_start_idx, self.lm_start_point, self.lm_start_s))
+#         rospy.loginfo('  lm_finish idx {} pos {} dist {:.2f}'.format(self.lm_finish_idx, self.lm_finish_point, self.lm_finish_s))
 
 #
 # Landmark crossing with hysteresis
@@ -86,13 +87,14 @@ class StateEstimator:
         self.meas_dist_to_start, self.meas_dist_to_finish = float('inf'), float('inf')
         self.predicted_dist_to_start, self.predicted_dist_to_finish = float('inf'), float('inf')
         self.start_residual, self.finish_residual = float('inf'), float('inf')
-        self.start_track = TrackMark(self.path.lm_start_s, 'start', hist=2)
-        self.finish_track = TrackMark(self.path.lm_finish_s, 'finish', hist=2)
+        self.start_track = TrackMark(self.path.lm_s[self.path.LM_START], 'start', hist=2)
+        self.finish_track = TrackMark(self.path.lm_s[self.path.LM_FINISH], 'finish', hist=2)
         self.last_stamp = None
 
     def load_path(self, path_filename):
         rospy.loginfo(' loading path: {}'.format(path_filename))
-        self.path = StateEstPath(path_filename)
+        #self.path = StateEstPath(path_filename)
+        self.path = trr_u.TrrPath(path_filename)
         self.path.report()
 
     def update_k_odom(self, v): print('k_odom {}'.format(v)); self.k_odom = v

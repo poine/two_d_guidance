@@ -27,8 +27,11 @@ def print_extends(cnt, txt, full=False):
 
 #
 # This is a specialized version of a path including a velocity profile
+# and landmarks
 #
 class TrrPath(tdg.path.Path):
+    LM_START, LM_FINISH, LM_NB = range(3)
+    lm_names = ['start', 'finish']
     def __init__(self, path_filename, v=0.6):
         tdg.path.Path.__init__(self)
         data = self.load(path_filename)
@@ -41,12 +44,31 @@ class TrrPath(tdg.path.Path):
             self.vels   = v*np.ones(len(self.points))
             self.accels = np.zeros(len(self.points))
             self.jerks  = np.zeros(len(self.points))
+        try:
+            self.lm_s = data['lm_s']  # landmark abscisses
+        except KeyError:
+            print(' no landmark abscisses in path, using defaults')
+            self.lm_s = [0., 16.66] # vedrines
+        self.lm_idx, self.lm_points = [], []
+        for _lm_s in self.lm_s:
+            _i, _p = self.find_point_at_dist_from_idx(0, _d=_lm_s)
+            self.lm_idx.append(_i) 
+            self.lm_points.append(_p) 
             
+        self.len = self.dists[-1] - self.dists[0]
             
     def save(self, filename):
         print('saving path to {}'.format(filename))
-        np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, jerks=self.jerks)
+        np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, jerks=self.jerks, lm_s=self.lm_s)
 
+    def report(self):
+        rospy.loginfo(' path len {:.2f}'.format(self.len))
+        rospy.loginfo(' path start {} (dist {:.2f}) '.format(self.points[0], self.dists[0]))
+        rospy.loginfo(' path finish {}(dist {:.2f})'.format(self.points[-1], self.dists[-1]))
+        rospy.loginfo('  lm_start idx {} pos {} dist {:.2f}'.format(self.lm_idx[self.LM_START], self.lm_points[self.LM_START], self.lm_s[self.LM_START]))
+        rospy.loginfo('  lm_finish idx {} pos {} dist {:.2f}'.format(self.lm_idx[self.LM_START], self.lm_points[self.LM_START], self.lm_s[self.LM_START]))
+
+        
 
 import matplotlib.pyplot as plt
 class LaneModel:
