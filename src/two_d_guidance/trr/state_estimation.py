@@ -13,7 +13,8 @@ import two_d_guidance as tdg
 class StateEstPath(tdg.path.Path):
     LM_START, LM_FINISH, LM_NB = range(3)
     lm_names = ['start', 'finish']
-    def __init__(self, path_filename, xstart=1.21, xfinish=0.86):
+    #def __init__(self, path_filename, xstart=1.21, xfinish=0.86):
+    def __init__(self, path_filename, xstart=0, xfinish=16.66): # vedrines
         tdg.path.Path.__init__(self, load=path_filename)
         self.len = self.dists[-1] - self.dists[0]
         # start is 1.25m before center of straight line
@@ -22,8 +23,9 @@ class StateEstPath(tdg.path.Path):
         # finish is 1.25m after center of straight line
         self.lm_finish_idx, self.lm_finish_point = self.find_point_at_dist_from_idx(0, _d=xfinish)
         self.lm_finish_s = self.dists[self.lm_finish_idx]
-        self.lm_s = [self.len-1.25, 1.25] # sim
+        #self.lm_s = [self.len-1.25, 1.25] # sim
         #self.lm_s = [self.len-1.21, 0.86] # real
+        self.lm_s = [0., 16.66] # vedrines
         self.lm_idx, self.lm_points = [], []
         for _lm_s in self.lm_s:
             _i, _p = self.find_point_at_dist_from_idx(0, _d=_lm_s)

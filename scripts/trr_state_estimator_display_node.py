@@ -19,8 +19,11 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
         self.s, self.c = 15., [380, 200] # vedrines
         self.path_points = np.array([ self._world_to_img(p) for p in path.points]).astype(np.int)
         path_len = path.dists[-1] - path.dists[0]
-        lm_start_idx, lm_start_point   = path.find_point_at_dist_from_idx(0, _d=path_len-1.21)
-        lm_finish_idx, lm_finish_point = path.find_point_at_dist_from_idx(0, _d=0.86)
+        # FIXME: read that from path
+        # lm_start_idx, lm_start_point   = path.find_point_at_dist_from_idx(0, _d=path_len-1.21)
+        # lm_finish_idx, lm_finish_point = path.find_point_at_dist_from_idx(0, _d=0.86)
+        lm_start_idx, lm_start_point   = path.find_point_at_dist_from_idx(0, _d=0)
+        lm_finish_idx, lm_finish_point = path.find_point_at_dist_from_idx(0, _d=16.66)
         self.lm_colors = [(0, 255, 0), (0, 0, 255)]
         self.lm_points = [tuple(self._world_to_img(lm_start_point).astype(np.int)), tuple(self._world_to_img(lm_finish_point).astype(np.int))]
         
