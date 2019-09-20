@@ -63,6 +63,7 @@ add_message_files(
 add_service_files(
    FILES
    SetMode.srv
+   GuidanceLoadVelProf.srv
    LandmarkPassed.srv
 )
 

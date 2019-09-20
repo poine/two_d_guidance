@@ -24,23 +24,26 @@ class VelCtl:
         # curv mode
         self.min_sp = 0.2
         self.k_curv = 0.5
-        
+        # second order reference model driven by input setpoint
         self.ref = tdg.utils.SecOrdLinRef(omega=4., xi=0.9)
         
     def load_profile(self, path_fname):
         self.path = trr_u.TrrPath(path_fname)
+        self.path.report()
 
         
     def get(self, lane_model, s, _is, dt=1./30):
         if self.mode == VelCtl.mode_cst:
-            return self.sp
+            #return self.sp # unfiltered
+            vel_ref = self.ref.run(dt, self.sp)[0]
+            return vel_ref
         elif self.mode == VelCtl.mode_profile:
             profile_sp = self.path.vels[_is]
             profile_acc = self.path.accels[_is]
             profile_jerk = self.path.jerks[_is]
-            vel_sp = self.ref.run(dt, profile_sp)[0]
+            vel_ref = self.ref.run(dt, profile_sp)[0]
             #return self.path.vels[_is]
-            return vel_sp
+            return vel_ref
         else:
             curv = lane_model.coefs[1]
             return max(self.min_sp, self.sp-np.abs(curv)*self.k_curv)
@@ -101,3 +104,6 @@ class Guidance:
         rospy.loginfo('guidance: setting mode to {}'.format(mode))
         self.mode = mode
     
+    def load_vel_profile(self, path_filename):
+        res = self.vel_ctl.load_profile(path_filename)
+        return res

@@ -8,6 +8,7 @@ import two_d_guidance.trr.utils as trr_u
 import two_d_guidance.trr.rospy_utils as trr_rpu
 import two_d_guidance.trr.guidance as trr_gui
 import two_d_guidance.cfg.trr_guidanceConfig  # dynamic reconfigure
+import two_d_guidance.srv                     # services
 
 import pdb
 
@@ -41,10 +42,21 @@ class Node(trr_rpu.PeriodicNode):
         cmd_topic = rospy.get_param('~cmd_topic', '/caroline/diff_drive_controller/cmd_vel')
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
+        # we expose a service for loading a velocity profile
+        self.lm_service = rospy.Service('GuidanceLoadVelProf', two_d_guidance.srv.GuidanceLoadVelProf, self.on_load_vel_profile)
+        # dynamic reconfigurable parameters
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.dyn_cfg_callback)
+        # 
         self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
 
+    def on_load_vel_profile(self, req):
+        path_filename = ''.join(req.path_filename)
+        print('on_load_vel_profile {}'.format(path_filename))
+        err = self.guidance.load_vel_profile(path_filename)
+        return two_d_guidance.srv.GuidanceLoadVelProfResponse(err)
+        
+      
     def dyn_cfg_callback(self, config, level):
         rospy.loginfo(" Reconfigure Request: mode: {guidance_mode}, lookahead: {lookahead_dist}, vel_setpoint: {vel_sp}".format(**config))
         self.guidance.set_mode(config['guidance_mode'])

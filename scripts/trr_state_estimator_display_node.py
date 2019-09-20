@@ -6,6 +6,7 @@ import rospy, cv2
 import pdb
 
 import two_d_guidance.trr.rospy_utils as trr_rpu
+import two_d_guidance.trr.utils as trr_u
 import two_d_guidance.trr.state_estimation as trr_se
 
 # on the robot
@@ -36,10 +37,12 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
         cv2.putText(img_bgr, 'State Est', (y0, 40), f, h, c, w)
         cv2.polylines(img_bgr, [self.path_points], isClosed=True, color=(255, 0, 0), thickness=2)
         try:
-            s_est, idx_s, v_est, dist_start, dist_to_finish = model.get()
+            s_est, idx_s, v_est, dist_start, dist_finish = model.get()
         
             cv2.putText(img_bgr, 's: {:.2f}m ({})'.format(s_est, idx_s), (y0, 90), f, h, c, w)
             cv2.putText(img_bgr, 'v: {:.1f}m/s'.format(v_est), (y0, 140), f, h, c, w)
+            cv2.putText(img_bgr, 'start: {:.1f}m/s'.format(dist_start), (y0, 190), f, h, c, w)
+            cv2.putText(img_bgr, 'finish: {:.1f}m/s'.format(dist_finish), (y0, 240), f, h, c, w)
             #cv2.putText(img_bgr, 'lap: {:d}'.format(cur_lap), (y0, 190), f, h, c, w)
         
             p_est_idx, p_est = path.find_point_at_dist_from_idx(0, _d=s_est)
@@ -61,7 +64,7 @@ class Node:
         def prefix(robot_name, what): return what if robot_name == '' else '{}/{}'.format(robot_name, what)
         cam_name = rospy.get_param('~camera', prefix(robot_name, 'camera_road_front'))
         path_filename = rospy.get_param('~path_filename')
-        self.path = trr_se.StateEstPath(path_filename) #'/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz'
+        self.path = trr_u.TrrPath(path_filename) #'/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz'
         rospy.loginfo('### se_display_node loaded {}'.format(path_filename))
         self.im_pub = ImgPublisher(self.path, cam_name)
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='state est display')
