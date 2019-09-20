@@ -24,7 +24,7 @@ class Contour1Pipeline(trr_vu.Pipeline):
         self.roi_h, self.roi_w = self.br[1]-self.tl[1], self.br[0]-self.tl[0]
         self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
         
-    def _process_image(self, img, cam):
+    def _process_image(self, img, cam, stamp):
         self.img = img
         self.img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         self.thresholder.process(self.img_gray)

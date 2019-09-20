@@ -695,7 +695,7 @@ class Pipeline:
         self.last_seq = seq
 
         _start = time.time()
-        self._process_image(img, cam)
+        self._process_image(img, cam, stamp)
         _end = time.time()
 
         self.last_processing_duration = _end-_start

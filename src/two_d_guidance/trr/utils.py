@@ -54,6 +54,7 @@ class LaneModel:
     # y = an.x^n + ...
     def __init__(self):
         self.coefs = [0., 0., 0., 0.01, 0.05]
+        self.stamp = None
         self.valid = False
         self.inliers_mask = []
 

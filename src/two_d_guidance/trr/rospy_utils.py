@@ -170,6 +170,7 @@ class LaneModelPublisher(SimplePublisher):
 
     def publish(self, lm):
         msg = two_d_guidance.msg.LaneModel()
+        msg.header.stamp = lm.stamp
         msg.poly = lm.coefs
         SimplePublisher.publish(self, msg)
 
@@ -181,6 +182,7 @@ class LaneModelSubscriber(SimpleSubscriber):
     def get(self, lm):
         msg = SimpleSubscriber.get(self) # raise exceptions
         lm.coefs = self.msg.poly
+        lm.stamp = self.msg.header.stamp
         lm.set_valid(True)
 
 

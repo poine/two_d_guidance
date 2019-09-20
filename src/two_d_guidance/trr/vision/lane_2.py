@@ -37,7 +37,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.roi = slice(self.tl[1], self.br[1]), slice(self.tl[0], self.br[0])
         self.init_masks()
         
-    def _process_image(self, img, cam):
+    def _process_image(self, img, cam, stamp):
         self.img = img
         self.img_roi = img[self.roi]
         if self.use_fancy_filtering:
@@ -51,11 +51,11 @@ class Contour2Pipeline(trr_vu.Pipeline):
         
         self.contour_finder.process(self.thresholder.threshold)
         if self.use_single_contour:
-            self._process_max_area_contour(cam)
+            self._process_max_area_contour(cam, stamp)
         else:
-            self._process_all_contours(cam)
+            self._process_all_contours(cam, stamp)
             
-    def _process_max_area_contour(self, cam):
+    def _process_max_area_contour(self, cam, stamp):
         ''' fit contour with max area (in img plan) '''
         if self.contour_finder.has_contour():
             cnt_max_noroi = self.contour_finder.get_contour() + self.tl
@@ -66,8 +66,9 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
+        self.lane_model.stamp = stamp
 
-    def _process_all_contours(self, cam):
+    def _process_all_contours(self, cam, stamp):
         ''' fit all valid contours '''
         self._compute_contours_lfp(cam)
         if len(self.cnts_lfp) > 0:
@@ -75,6 +76,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             self.lane_model.set_valid(True)
         else:
             self.lane_model.set_valid(False)
+        self.lane_model.stamp = stamp
 
             
     def _compute_contours_lfp(self, cam):

@@ -43,7 +43,7 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
         self.roi = slice(tl[1], br[1]), slice(tl[0], br[0])
 
             
-    def _process_image(self, img_bgr, cam):
+    def _process_image(self, img_bgr, cam, stamp):
         self.img_bgr = img_bgr
         self.roi_img_bgr = self.img_bgr[self.roi]
         self.sfd.process_image(self.roi_img_bgr)

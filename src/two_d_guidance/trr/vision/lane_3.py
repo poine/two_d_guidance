@@ -21,7 +21,8 @@ class Contour3Pipeline(trr_vu.Pipeline):
         self.img = None
         
     def set_roi(self, tl, br): pass
-    def _process_image(self, img, cam):
+
+    def _process_image(self, img, cam, stamp):
         self.img = img
         self.img_unwarped = self.bird_eye.undist_unwarp_map(img, cam)
         if self.use_fancy_filtering:

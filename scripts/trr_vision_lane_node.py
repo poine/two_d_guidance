@@ -25,7 +25,7 @@ import two_d_guidance.cfg.trr_vision_laneConfig
 class Node(trr_rpu.TrrSimpleVisionPipeNode):
 
     def __init__(self):
-        pipe_type = 2
+        pipe_type = 1
         pipe_classes = [trr_l1.Contour1Pipeline, trr_l2.Contour2Pipeline, trr_l3.Contour3Pipeline, trr_l4.Foo4Pipeline ]
         trr_rpu.TrrSimpleVisionPipeNode.__init__(self, pipe_classes[pipe_type], self.pipe_cbk)
         
