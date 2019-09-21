@@ -2,7 +2,7 @@
 import logging, sys, math, numpy as np
 import matplotlib.pyplot as plt, matplotlib
 
-from. import path, utils
+from. import path, utils, plot_utils
 
 import pdb
 
@@ -202,6 +202,52 @@ def draw_path_curvature(fig, ax, path):
 def draw_path_vel(fig, ax, path):
     plt.title('vel')
     plt.plot(path.vels)
+
+def draw_path_accel(fig, ax, path):
+    plt.title('accel')
+    plt.plot(path.accels)
+
+def draw_path_vel_profile(fig, path):
+    ax1 = plt.subplot(3,1,1)
+    plt.plot(path.vels)
+    plot_utils.decorate(ax1, 'vel', 'idx', 'm/s')
+    ax2 = plt.subplot(3,1,2)
+    plt.plot(path.accels)
+    plot_utils.decorate(ax2, 'accel', 'idx', 'm/s2')
+    ax3 = plt.subplot(3,1,3)
+    plt.plot(path.jerks)
+    plot_utils.decorate(ax3, 'jerk', 'idx', 'm/s3')
+    
+def draw_path_vel_2D(fig, ax, path):
+    draw_path_2D(fig, ax, path, path.vels)
+    plt.title('2D: velocity along path')
+
+def draw_path_accel_2D(fig, ax, path):
+    draw_path_2D(fig, ax, path, path.accels)
+    plt.title('2D: accels along path')
+
+def draw_path_lat_accel_2D(fig, ax, path):
+    lat_accel = np.abs(path.curvatures*np.square(path.vels))
+    draw_path_2D(fig, ax, path, lat_accel)
+    plt.title('2D: lat accels along path')
+    
+
+def draw_path_2D(fig, ax, path, color_vals):
+    points = path.points.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    min_v, max_v = np.min(color_vals), np.max(color_vals)
+    norm = plt.Normalize(min_v, max_v)
+    lc = matplotlib.collections.LineCollection(segments, cmap='jet', norm=norm)
+    lc.set_array(color_vals)
+    lc.set_linewidth(2)
+    line = ax.add_collection(lc)
+    fig.colorbar(line, ax=ax)
+    dx, dy = 0.1, 0.1
+    ax.set_xlim(path.points[:,0].min()-dx, path.points[:,0].max()+dx)
+    ax.set_ylim(path.points[:,1].min()-dy, path.points[:,1].max()+dy)
+    ax.set_aspect('equal')
+    
+    
     
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)

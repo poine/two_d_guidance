@@ -62,12 +62,13 @@ class TrrPath(tdg.path.Path):
         np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, jerks=self.jerks, lm_s=self.lm_s)
 
     def report(self):
-        rospy.loginfo(' path len {:.2f}'.format(self.len))
+        rospy.loginfo(' path len {:.2f} m'.format(self.len))
         rospy.loginfo(' path start {} (dist {:.2f}) '.format(self.points[0], self.dists[0]))
         rospy.loginfo(' path finish {}(dist {:.2f})'.format(self.points[-1], self.dists[-1]))
         rospy.loginfo('  lm_start idx {} pos {} dist {:.2f}'.format(self.lm_idx[self.LM_START], self.lm_points[self.LM_START], self.lm_s[self.LM_START]))
         rospy.loginfo('  lm_finish idx {} pos {} dist {:.2f}'.format(self.lm_idx[self.LM_FINISH], self.lm_points[self.LM_FINISH], self.lm_s[self.LM_FINISH]))
         rospy.loginfo('  vels min/avg/max {:.1f} {:.1f} {:.1f} m/s'.format(np.min(self.vels), np.mean(self.vels), np.max(self.vels)))
+        rospy.loginfo('  accels min/avg/max {:.1f} {:.1f} {:.1f} m/s'.format(np.min(self.accels), np.mean(self.accels), np.max(self.accels)))
 
         
 
