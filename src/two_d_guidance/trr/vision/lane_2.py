@@ -7,9 +7,8 @@ import pdb
 
 class Contour2Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
-    def __init__(self, cam, robot_name, use_single_contour=False, ctr_img_min_area=200):
+    def __init__(self, cam, robot_name, ctr_img_min_area=50):
         trr_vu.Pipeline.__init__(self)
-        self.use_single_contour = use_single_contour
         self.use_fancy_filtering = True
         self.cam = cam
         be_param = trr_vu.NamedBirdEyeParam(robot_name)
@@ -50,36 +49,10 @@ class Contour2Pipeline(trr_vu.Pipeline):
         cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)
         
         self.contour_finder.process(self.thresholder.threshold)
-        if self.use_single_contour:
-            self._process_max_area_contour(cam, stamp)
-        else:
-            self._process_all_contours(cam, stamp)
+        self._process_all_contours(cam, stamp)
             
-    def _process_max_area_contour(self, cam, stamp):
-        ''' fit contour with max area (in img plan) '''
-        if self.contour_finder.has_contour():
-            cnt_max_noroi = self.contour_finder.get_contour() + self.tl
-            cnt_max_imp = cam.undistort_points(cnt_max_noroi.astype(np.float32))
-            self.cnt_max_be = self.bird_eye.points_imp_to_be(cnt_max_imp)
-            self.cnt_max_lfp = self.bird_eye.unwarped_to_fp(cam, self.cnt_max_be)
-            self.lane_model.fit(self.cnt_max_lfp[:,:2])
-            self.lane_model.set_valid(True)
-        else:
-            self.lane_model.set_valid(False)
-        self.lane_model.stamp = stamp
-
     def _process_all_contours(self, cam, stamp):
         ''' fit all valid contours '''
-        self._compute_contours_lfp(cam)
-        if len(self.cnts_lfp) > 0:
-            self.lane_model.fit(self.cnts_lfp)
-            self.lane_model.set_valid(True)
-        else:
-            self.lane_model.set_valid(False)
-        self.lane_model.stamp = stamp
-
-            
-    def _compute_contours_lfp(self, cam):
         self.cnts_be, self.cnts_lfp = [], []
         if self.contour_finder.valid_cnts is None: return
 
@@ -88,9 +61,15 @@ class Contour2Pipeline(trr_vu.Pipeline):
             cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
             self.cnts_be.append(cnt_be)
             cnt_lfp = self.bird_eye.points_imp_to_blf(cnt_imp)
-            #print cnt_lfp.shape, cnt_lfp.dtype
             self.cnts_lfp.append(cnt_lfp)
         self.cnts_lfp = np.array(self.cnts_lfp)
+
+        if len(self.cnts_lfp) > 0:
+            self.lane_model.fit(self.cnts_lfp)
+            self.lane_model.set_valid(True)
+        else:
+            self.lane_model.set_valid(False)
+        self.lane_model.stamp = stamp
 
         
     def draw_debug(self, cam, img_cam=None):
@@ -154,13 +133,10 @@ class Contour2Pipeline(trr_vu.Pipeline):
         
     def _draw_be(self, cam):
         try:
-            if self.use_single_contour:
-                debug_img = self.bird_eye.draw_debug(cam, None, self.lane_model, [self.cnt_max_be])
-            else:
-                undistorted_img = cam.undistort_img_map(self.img)
-                #unwarped_img = self.bird_eye.process(undistorted_img)
-                unwarped_img = self.bird_eye.unwarp_map(undistorted_img)
-                debug_img = self.bird_eye.draw_debug(cam, unwarped_img, self.lane_model, self.cnts_be)
+            undistorted_img = cam.undistort_img_map(self.img)
+            #unwarped_img = self.bird_eye.process(undistorted_img)
+            unwarped_img = self.bird_eye.unwarp_map(undistorted_img)
+            debug_img = self.bird_eye.draw_debug(cam, unwarped_img, self.lane_model, self.cnts_be)
         except AttributeError:
             debug_img = np.zeros((cam.h, cam.w, 3), dtype=np.uint8)
         return debug_img
