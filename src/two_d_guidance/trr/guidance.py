@@ -20,9 +20,9 @@ class VelCtl:
     def __init__(self, path_fname):
         self.load_profile(path_fname)
         self.mode = VelCtl.mode_cst#VelCtl.mode_curv#
-        self.sp = 1.
+        self.sp = 1.5
         # curv mode
-        self.min_sp = 0.2
+        self.min_sp = 1.
         self.k_curv = 0.5
         # second order reference model driven by input setpoint
         self.ref = tdg.utils.SecOrdLinRef(omega=4., xi=0.9)
@@ -91,7 +91,9 @@ class Guidance:
                 elif s > 0.5 and s < 1.: dy -= 0.25
             self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
             self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
+            delay = rospy.Time.now().to_sec() - self.lane.stamp.to_sec()
             self.carrot = [self.lookahead_dist, self.lane.get_y(self.lookahead_dist)+dy]
+            self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
             self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
             lin, ang = lin, lin/self.R
             ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
@@ -107,3 +109,25 @@ class Guidance:
     def load_vel_profile(self, path_filename):
         res = self.vel_ctl.load_profile(path_filename)
         return res
+
+
+def _time_compensate(carrot, previous_speed, previous_ang, delay=1/30):
+    if previous_ang == 0 or previous_speed == 0:
+        carrot[0] -= previous_speed * delay
+        return carrot
+    else:
+        # Arc length = R * angle
+        # =>(1) angle = arc length / R
+        # Arc length = speed * time
+        # =>(2) arc length = previous_speed * delay
+        # (3) R = previous_speed / previous_ang
+        # (1, 2, 3) => angle = previous_speed * delay / (previous_speed / previous_ang)
+        # => angle = delay * previous_ang
+        rotation_ang = delay * previous_ang
+        previous_r = previous_speed / previous_ang
+        carrot[0] -= np.sin(rotation_ang)*previous_r
+        carrot[1] += (1 - np.cos(rotation_ang)) * previous_r
+        new_x = carrot[0] * np.cos(rotation_ang) + carrot[1] * np.sin(rotation_ang)
+        new_y = -carrot[0] * np.sin(rotation_ang) + carrot[1] * np.cos(rotation_ang)
+        return [new_x, new_y]
+
