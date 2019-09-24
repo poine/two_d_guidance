@@ -61,6 +61,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
             cnt_be = self.bird_eye.points_imp_to_be(cnt_imp)
             self.cnts_be.append(cnt_be)
             cnt_lfp = self.bird_eye.points_imp_to_blf(cnt_imp)
+            np.clip(cnt_lfp[:, 0, 0], 0.01, 3., out=cnt_lfp[:, 0, 0])
             self.cnts_lfp.append(cnt_lfp)
         self.cnts_lfp = np.array(self.cnts_lfp)
 
