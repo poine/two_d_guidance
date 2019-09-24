@@ -95,7 +95,7 @@ class LaneModel:
             xs = np.append(xs, c[:, 0, 0])
             ys = np.append(ys, c[:, 0, 1])
             weights = np.append(weights, [area / len(c)] * len(c))
-        
+
         self.coefs, _res, rank, _singular, _rcond = np.polyfit(xs, ys, order, full=True, w=weights)
         if rank <= order:
             reduced_order = min(1, rank - 2)
@@ -120,7 +120,9 @@ class LaneModel:
             high_ref_point = np.multiply(np.add(all_min, np.multiply(all_max, 3)), 0.25)
 
             # priority is defined by (max - min) / min = max/min - 1, but -1 constant is simplified
-            all_priorities = np.divide(all_max, all_min)
+            # offset to increase priority of near contours
+            offset = min(all_min) / 2
+            all_priorities = np.divide(np.add(all_max, -offset), np.add(all_min, -offset))
             
             remaining = len(ctrs)
             selected = [ ]
@@ -131,7 +133,6 @@ class LaneModel:
                 this_max = all_max[best_id]
                 all_priorities[best_id] = -1
                 remaining -= 1
-                valid = True
 
                 # New contour has to match with building curve
                 if len(selected) > 0:
@@ -168,9 +169,6 @@ class LaneModel:
                             
                 if remaining == 0:
                     break
-                
-            #all_moments = [cv2.moments(c) for c in ctrs]
-            #eccentricity = ((moments['mu20'] - moments['mu02'])*(moments['mu20'] - moments['mu02']) - 4*moments['mu11']*moments['mu11'])/((moments['mu20'] + moments['mu02'])*(moments['mu20'] + moments['mu02']))
 
             self.fit_all_contours(selected, order)
 
