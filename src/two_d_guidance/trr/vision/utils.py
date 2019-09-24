@@ -547,8 +547,9 @@ class StartFinishDetector:
 
 
 class BinaryThresholder:
-    def __init__(self, thresh=200):
+    def __init__(self, thresh=200, offset=15):
         self.thresh_val = thresh
+        self.offset_val = -offset
         self.threshold = None
         
     def process(self, img):
@@ -567,7 +568,7 @@ class BinaryThresholder:
             width = 20
             bridge_img = bridge_filter(blue_img, width, width)
             # Level -10 for inside, -15 for outside
-            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
+            self.threshold = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, self.offset_val)
         else:
             res = []
             # Calibration for christine
@@ -577,13 +578,14 @@ class BinaryThresholder:
                 mini_img = blue_img[step[0]:step[1], :]
                 bridge_img = bridge_filter(mini_img, width, h)
                 # Level -10 for inside, -15 for outside
-                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, -15)
+                bridge_th_img = cv2.adaptiveThreshold(bridge_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 351, self.offset_val)
                 res.append(bridge_th_img)
             self.threshold = cv2.vconcat(res)
             
         return self.threshold    
             
     def set_threshold(self, thresh): self.thresh_val = thresh
+    def set_offset(self, offset): self.offset_val = -offset
 
             
 class BlackWhiteThresholder:
