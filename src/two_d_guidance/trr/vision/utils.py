@@ -498,6 +498,7 @@ class StartFinishDetector:
     CTR_START, CTR_FINISH, CTR_NB = range(3)
     def __init__(self):
         self.min_area = 3000
+        self.min_eccentricity = 0.8
         self.colors = [hsv_green_range(hc=80, smin=65, vmin=70), hsv_red_range(hc=175)]
         self.masks = [None, None]
         self.counts = [0, 0]
@@ -512,7 +513,11 @@ class StartFinishDetector:
     def get_center_coords(self, ctr_idx): return self.center_coords[ctr_idx]
     
     def set_hsv_range(self, color_idx, hsv_range): self.colors[color_idx] = hsv_range
-          
+
+    def set_thresholds(self, min_area, min_eccentricity):
+        self.min_area = min_area
+        self.min_eccentricity = min_eccentricity
+        
     def process_image(self, bgr_img):
         hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
         for idx, color_ranges in enumerate(self.colors):
@@ -531,7 +536,7 @@ class StartFinishDetector:
             if m00 > self.min_area:
                 mu02, mu20, mu11 = map(moments.get, ['mu02', 'mu20', 'mu11'])
                 eccentricity = ((mu20 - mu02)*(mu20 - mu02) - 4*mu11*mu11)/((mu20 + mu02)*(mu20 + mu02))
-                self.detected[idx] = eccentricity > 0.8
+                self.detected[idx] = eccentricity > self.min_eccentricity
                 self.eccentricities[idx] = eccentricity
             else:
                 self.detected[idx] = False
@@ -542,7 +547,7 @@ class StartFinishDetector:
             else :
                 self.center_coords[idx] = (np.float('inf'), np.float('inf'))                
 
-    def draw(self, bgr_img, x0=220, y0=20, dy=35, h=0.75):
+    def draw(self, bgr_img, x0=220, y0=80, dy=35, h=0.75):
         if self.masks[self.CTR_START] is None or self.masks[self.CTR_FINISH] is None:
             return np.zeros_like(bgr_img)
         blue = np.zeros(self.masks[0].shape, np.uint8)
@@ -573,17 +578,10 @@ class BinaryThresholder:
         self.thresh_val = thresh
         self.offset_val = -offset
         self.threshold = None
+            
+    def set_offset(self, offset):
+        self.offset_val = -offset
         
-    def process(self, img):
-        blurred = cv2.GaussianBlur(img, (9, 9), 0)
-        #blurred = cv2.GaussianBlur(img, (25, 25), 0)
-        #self.threshold = blurred
-        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
-        #ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        #self.threshold = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 151, -30)
-        #self.threshold = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 101, -30)
-        return self.threshold
-
     def process_bgr(self, img, birdeye_mode=True):
         blue_img = img[:, :, 0]
         if birdeye_mode:
@@ -605,11 +603,8 @@ class BinaryThresholder:
             self.threshold = cv2.vconcat(res)
             
         return self.threshold    
-            
-    def set_threshold(self, thresh): self.thresh_val = thresh
-    def set_offset(self, offset): self.offset_val = -offset
 
-            
+
 class BlackWhiteThresholder:
     def __init__(self):
         self.low, self.high = 196, 255

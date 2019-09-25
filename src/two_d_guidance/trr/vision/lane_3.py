@@ -9,7 +9,6 @@ class Contour3Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam, robot_name):
         trr_vu.Pipeline.__init__(self)
-        self.use_fancy_filtering = False
         be_param = trr_vu.NamedBirdEyeParam(robot_name)
         self.cam = cam
         self.set_roi((0, 0), (cam.w, cam.h))
@@ -25,14 +24,9 @@ class Contour3Pipeline(trr_vu.Pipeline):
     def _process_image(self, img, cam, stamp):
         self.img = img
         self.img_unwarped = self.bird_eye.undist_unwarp_map(img, cam)
-        if self.use_fancy_filtering:
-            self.thresholder.process_bgr(self.img_unwarped, True)
-            ### masks...
-            cv2.fillPoly(self.thresholder.threshold, [self.bird_eye.mask_unwraped], color=0)
-        else:
-            self.img_gray = cv2.cvtColor(self.img_unwarped, cv2.COLOR_BGR2GRAY )
-            self.thresholder.process(self.img_gray)
-
+        self.thresholder.process_bgr(self.img_unwarped, True)
+        ### masks...
+        cv2.fillPoly(self.thresholder.threshold, [self.bird_eye.mask_unwraped], color=0)
         
         self.contour_finder.process(self.thresholder.threshold)
         self.cnts_be = self.contour_finder.valid_cnts if self.contour_finder.valid_cnts is not None else []

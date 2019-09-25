@@ -100,14 +100,12 @@ if __name__ == '__main__':
         pipe.display_mode = pipe.show_contour
     elif pipe_type == pipe_2:  # now 200hz
         pipe = trr_l2.Contour2Pipeline(cam, robot_names[robot], ctr_img_min_area=50); # 500
-        pipe.use_fancy_filtering = True
         pipe.thresholder.set_threshold(160)  # indoor: 120  outdoor: 160-170
         pipe.thresholder.set_offset(10)
         pipe.set_roi((0, 20), (cam.w, cam.h))
         pipe.display_mode = trr_l2.Contour2Pipeline.show_contour
     elif pipe_type == pipe_3:
         pipe = trr_l3.Contour3Pipeline(cam, robot_names[robot])
-        pipe.use_fancy_filtering = True
         pipe.contour_finder.min_area = 30
         pipe.thresholder.set_threshold(160)
         pipe.set_roi((0, 20), (cam.w, cam.h))

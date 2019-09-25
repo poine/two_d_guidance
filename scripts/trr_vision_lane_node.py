@@ -47,7 +47,6 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         rospy.loginfo("  Reconfigure Request:")
         try:
             self.pipeline.contour_finder.min_area = config['mask_min_area']
-            self.pipeline.thresholder.set_threshold(config['mask_threshold'])
             self.pipeline.thresholder.set_offset(config['bridge_offset'])
         except AttributeError: pass
         self.pipeline.display_mode = config['display_mode']

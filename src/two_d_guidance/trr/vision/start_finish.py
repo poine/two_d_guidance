@@ -23,11 +23,14 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
     def set_debug_display(self, display_mode, show_hud):
         self.display_mode, self.show_hud = display_mode, show_hud
 
-    def set_green_mask_params(self, hc, hs, smin, smax, vmin, vmax, gray_thr):
+    def set_thresholds(self, min_area, min_eccentricity):
+        self.sfd.set_thresholds(min_area, min_eccentricity)
+
+    def set_green_mask_params(self, hc, hs, smin, smax, vmin, vmax):
         self.sfd.set_hsv_range(self.sfd.CTR_START, trr_vu.hsv_range(hc, hs, smin, smax, vmin, vmax))
 
-    def set_red_mask_params(self, hc, hs, smin, smax, vmin, vmax, gray_thr):
-        #param_txt = '{} {} / {} {} / {} {} / {}'.format(hc, hs, smin, smax, vmin, vmax, gray_thr)
+    def set_red_mask_params(self, hc, hs, smin, smax, vmin, vmax):
+        #param_txt = '{} {} / {} {} / {} {}'.format(hc, hs, smin, smax, vmin, vmax)
         #print('StartFinishDetectPipeline::set_red_mask_params: {}'.format(param_txt))
         self.sfd.set_hsv_range(self.sfd.CTR_FINISH, trr_vu.hsv_range(hc, hs, smin, smax, vmin, vmax))
         
@@ -97,8 +100,8 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
         self.draw_timing(out_img, x0=350)   
         f, h, c, w = cv2.FONT_HERSHEY_SIMPLEX, 1.25, font_color, 2
         tg, tr = 'no', 'no'
-        if self.sfd.sees_start():  tg = 'area: {:.1f} dist: {:.2f}'.format(0, self.dist_to_start)
-        if self.sfd.sees_finish(): tr = 'area: {:.1f} dist: {:.2f}'.format(0, self.dist_to_finish)
+        if self.sfd.sees_start():  tg = 'dist: {:.2f}'.format(self.dist_to_start)
+        if self.sfd.sees_finish(): tr = 'dist: {:.2f}'.format(self.dist_to_finish)
         cv2.putText(out_img, 'StartFinish', (y0, 40), f, h, c, w)
         cv2.putText(out_img, 'start:  {}'.format(tg), (y0, cam.h-70), f, h, c, w)
         cv2.putText(out_img, 'finish: {}'.format(tr), (y0, cam.h-20), f, h, c, w)

@@ -42,8 +42,8 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         self.pipeline.set_roi(tl, br) 
 
         self.mask_param_names = ['_hc', '_hs', '_smin', '_smax', '_vmin', '_vmax']
-        self.green_mask_params = [rospy.get_param('~g'+_p) for _p in self.mask_param_names] + [0]
-        self.red_mask_params = [rospy.get_param('~r'+_p) for _p in self.mask_param_names] + [0]
+        self.green_mask_params = [rospy.get_param('~g'+_p) for _p in self.mask_param_names]
+        self.red_mask_params = [rospy.get_param('~r'+_p) for _p in self.mask_param_names]
         self.pipeline.set_green_mask_params(*self.green_mask_params)
         self.pipeline.set_red_mask_params(*self.red_mask_params)
         rospy.loginfo('green mask params {}'.format(self.green_mask_params))
@@ -64,8 +64,9 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
                 cfg['g'+_p] = _v
         else: # subsequent calls (GUI has modified a parameter)
             self.pipeline.set_debug_display(cfg['display_mode'], cfg['show_hud'])
-            self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax, cfg.g_gthr)
-            self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax, cfg.r_gthr)
+            self.pipeline.set_thresholds(cfg['min_area'], cfg['min_eccentricity'])
+            self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax)
+            self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax)
             yt, xbr, ybr = cfg.roi_yt, self.cam.w, self.cam.h
             tl, br = (0, yt), (xbr, ybr)
             self.pipeline.set_roi(tl, br)

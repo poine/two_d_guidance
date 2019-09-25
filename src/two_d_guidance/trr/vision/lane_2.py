@@ -9,7 +9,6 @@ class Contour2Pipeline(trr_vu.Pipeline):
     show_none, show_input, show_thresh, show_contour, show_be = range(5)
     def __init__(self, cam, robot_name, ctr_img_min_area=50):
         trr_vu.Pipeline.__init__(self)
-        self.use_fancy_filtering = True
         self.cam = cam
         be_param = trr_vu.NamedBirdEyeParam(robot_name)
         self.set_roi((0, 0), (cam.w, cam.h))
@@ -39,11 +38,7 @@ class Contour2Pipeline(trr_vu.Pipeline):
     def _process_image(self, img, cam, stamp):
         self.img = img
         self.img_roi = img[self.roi]
-        if self.use_fancy_filtering:
-            self.thresholder.process_bgr(self.img_roi, birdeye_mode=False)
-        else:
-            self.img_gray = cv2.cvtColor(self.img_roi, cv2.COLOR_BGR2GRAY )
-            self.thresholder.process(self.img_gray)
+        self.thresholder.process_bgr(self.img_roi, birdeye_mode=False)
 
         ### masks...
         cv2.fillPoly(self.thresholder.threshold, [self.be_mask_roi, self.car_mask_roi], color=0)
