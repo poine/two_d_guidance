@@ -500,6 +500,8 @@ class StartFinishDetector:
         self.min_area = 3000
         self.colors = [hsv_green_range(hc=80, smin=65, vmin=70), hsv_red_range(hc=175)]
         self.masks = [None, None]
+        self.counts = [0, 0]
+        self.eccentricities = [None, None]
         self.detected = [False, False]
         self.areas = [0, 0]
         self.center_coords = [(np.float('inf'), np.float('inf')) for i in range(self.CTR_NB)]
@@ -513,7 +515,6 @@ class StartFinishDetector:
           
     def process_image(self, bgr_img):
         hsv = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2HSV)
-
         for idx, color_ranges in enumerate(self.colors):
             # self.masks[idx] = None
             # for color in color_ranges:
@@ -526,23 +527,40 @@ class StartFinishDetector:
                     
             moments = cv2.moments(self.masks[idx], True)
             m00 = moments['m00']
+            self.counts[idx] = m00
             if m00 > self.min_area:
                 mu02, mu20, mu11 = map(moments.get, ['mu02', 'mu20', 'mu11'])
                 eccentricity = ((mu20 - mu02)*(mu20 - mu02) - 4*mu11*mu11)/((mu20 + mu02)*(mu20 + mu02))
                 self.detected[idx] = eccentricity > 0.8
+                self.eccentricities[idx] = eccentricity
             else:
                 self.detected[idx] = False
+                self.eccentricities[idx] = None
+                
             if self.detected[idx]:
                 self.center_coords[idx] = moments['m10']/m00, moments['m01']/m00
-                
-            #print "area = " + str(m00) + "  e = " + str(eccentricity)
+            else :
+                self.center_coords[idx] = (np.float('inf'), np.float('inf'))                
 
-    def draw(self, bgr_img):
+    def draw(self, bgr_img, x0=220, y0=20, dy=35, h=0.75):
         if self.masks[self.CTR_START] is None or self.masks[self.CTR_FINISH] is None:
             return np.zeros_like(bgr_img)
         blue = np.zeros(self.masks[0].shape, np.uint8)
         green, red = self.masks
         img = cv2.merge((blue, green, red))
+        
+        f, w = cv2.FONT_HERSHEY_SIMPLEX, 2
+        for i in range(self.CTR_NB):
+            c = cv2.cvtColor( ((np.array(self.colors[i][0][0], dtype=np.uint16) + self.colors[i][0][1]) / 2).astype(np.uint8).reshape((1, 1, 3)), cv2.COLOR_HSV2BGR).reshape(3)
+            try:
+                if self.eccentricities[i] is None:
+                    txt = 'count: {:5.0f}'.format(self.counts[i])
+                else:
+                    txt = 'count: {:5.0f} (e: {:.2f})'.format(self.counts[i], self.eccentricities[i])
+                cv2.putText(img, txt, (x0, y0 + dy*i), f, h, (int(c[0]), int(c[1]), int(c[2])), w)
+            except AttributeError: pass
+            if self.detected[i]:
+                cv2.circle(img, (int(self.center_coords[i][0]), int(self.center_coords[i][1])), 10, (0, 255, 255), thickness=5)
         return img
 
 
