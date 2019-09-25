@@ -86,6 +86,8 @@ class StartFinishDetectPipeline(trr_vu.Pipeline):
                 out_img[self.roi] = roi_img
             except TypeError:
                 print('type error')
+            except ValueError:
+                print('Different image size')
         if self.show_hud: self.draw_hud(out_img, cam)
         # we return a BGR8 image
         return out_img

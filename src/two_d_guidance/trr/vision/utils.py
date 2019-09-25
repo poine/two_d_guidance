@@ -547,8 +547,12 @@ class StartFinishDetector:
             return np.zeros_like(bgr_img)
         blue = np.zeros(self.masks[0].shape, np.uint8)
         green, red = self.masks
-        img = cv2.merge((blue, green, red))
-        
+        try:
+            img = cv2.merge((blue, green, red))
+        except RuntimeError: # Mask size has changed (concurrency problem)
+            blue = np.zeros(self.masks[0].shape, np.uint8)
+            img = cv2.merge((blue, green, red))
+            
         f, w = cv2.FONT_HERSHEY_SIMPLEX, 2
         for i in range(self.CTR_NB):
             c = cv2.cvtColor( ((np.array(self.colors[i][0][0], dtype=np.uint16) + self.colors[i][0][1]) / 2).astype(np.uint8).reshape((1, 1, 3)), cv2.COLOR_HSV2BGR).reshape(3)
