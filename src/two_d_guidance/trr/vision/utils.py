@@ -397,14 +397,11 @@ class ContourFinder:
 
 class ColoredContourDetector:
     def __init__(self, hsv_range, min_area=None, gray_tresh=150):
-        #self.mask_extractor = ColoredMaskExtractor(hsv_range)
-        self.mask_extractor = ColoredAndLightMaskExtractor(hsv_range)
+        self.mask_extractor = ColoredMaskExtractor(hsv_range)
         self.bin_ctr_finder = ContourFinder(min_area)
 
     def set_hsv_range(self, hsv_range):
         self.mask_extractor.set_hsv_range(hsv_range)
-    def set_gray_threshold(self, v): 
-        self.mask_extractor.set_threshold(v)
 
     def get_hsv_range(self): return self.mask_extractor.get_hsv_range()
         
@@ -440,17 +437,6 @@ class ColoredMaskExtractor:
         self.mask = np.sum(masks, axis=0).astype(np.uint8)
         return self.mask
 
-class ColoredAndLightMaskExtractor(ColoredMaskExtractor):
-    def __init__(self,  hsv_range, gray_thresh=150):
-        ColoredMaskExtractor.__init__(self,  hsv_range)
-        self.grey_mask = BinaryThresholder(thresh=gray_thresh)
-
-    def set_threshold(self, v): self.grey_mask.set_threshold(v)
-
-    def process_hsv_image(self, hsv_img, img_gray):
-        ColoredMaskExtractor.process_hsv_image(self, hsv_img, img_gray)
-        self.mask += self.grey_mask.process(img_gray)
-        return self.mask
         
 #
 # HSV range for different colors in cv conventions (h in [0 180], s and v in [0 255]

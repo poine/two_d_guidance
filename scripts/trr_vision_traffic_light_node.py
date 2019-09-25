@@ -22,9 +22,9 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         #print cfg, level
         self.pipeline.set_debug_display(cfg['display_mode'], cfg['show_hud'])
         #pdb.set_trace()
-        self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax, cfg.g_gthr)
+        self.pipeline.set_green_mask_params(cfg.g_hc, cfg.g_hs, cfg.g_smin, cfg.g_smax, cfg.g_vmin, cfg.g_vmax)
 
-        self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax, cfg.r_gthr)
+        self.pipeline.set_red_mask_params(cfg.r_hc, cfg.r_hs, cfg.r_smin, cfg.r_smax, cfg.r_vmin, cfg.r_vmax)
 
         x, y, dx, dy = cfg.roi_xc, cfg.roi_yc, cfg.roi_dx, cfg.roi_dy
         tl, br = (x-dx/2, y-dy/2), (x+dx/2, y+dy/2)

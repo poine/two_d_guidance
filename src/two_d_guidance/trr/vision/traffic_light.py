@@ -29,15 +29,13 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         self.roi_h, self.roi_w = br[1]-tl[1], br[0]-tl[0]
         self.roi = slice(tl[1], br[1]), slice(tl[0], br[0])
         
-    def set_green_mask_params(self, hc, hs, smin, smax, vmin, vmax, gray_thr): 
+    def set_green_mask_params(self, hc, hs, smin, smax, vmin, vmax): 
         self.green_ctr_detc.set_hsv_range(trr_vu.hsv_range(hc, hs, smin, smax, vmin, vmax))
-        self.green_ctr_detc.set_gray_threshold(gray_thr)
 
-    def set_red_mask_params(self, hc, hs, smin, smax, vmin, vmax, gray_thr): 
+    def set_red_mask_params(self, hc, hs, smin, smax, vmin, vmax): 
         red_range = trr_vu.hsv_range(hc, hs, smin, smax, vmin, vmax)
         #print('red range : {}'.format(red_range))
         self.red_ctr_detc.set_hsv_range(red_range)
-        self.red_ctr_detc.set_gray_threshold(gray_thr)
         
     def _process_image(self, img_bgr, cam):
         # we receive a BGR image 
