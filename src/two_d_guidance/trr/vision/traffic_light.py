@@ -37,7 +37,7 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         #print('red range : {}'.format(red_range))
         self.red_ctr_detc.set_hsv_range(red_range)
         
-    def _process_image(self, img_bgr, cam):
+    def _process_image(self, img_bgr, cam, stamp):
         # we receive a BGR image 
         self.img_bgr = img_bgr
         #self.img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)

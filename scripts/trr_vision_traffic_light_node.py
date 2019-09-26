@@ -16,6 +16,7 @@ class Node(trr_rpu.TrrSimpleVisionPipeNode):
         #self.img_pub = trr_rpu.ImgPublisher(self.cam, '/trr_vision/traffic_light/image_debug')
         self.img_pub = trr_rpu.CompressedImgPublisher(self.cam, '/trr_vision/traffic_light/image_debug')
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_vision_traffic_lightConfig, self.cfg_callback)
+        self.start()
 
     def cfg_callback(self, cfg, level):
         rospy.loginfo("  Reconfigure Request:")
