@@ -24,6 +24,7 @@ class VelCtl:
         # curv mode
         self.min_sp = 1.
         self.k_curv = 0.5
+        self.max_accel = 2.
         # second order reference model driven by input setpoint
         self.ref = tdg.utils.SecOrdLinRef(omega=4., xi=0.9)
         
@@ -31,17 +32,19 @@ class VelCtl:
         self.path = trr_u.TrrPath(path_fname)
         self.path.report()
 
+    def reset_ref(self, v0):
+        self.ref.reset(np.array([v0, 0, 0]))
         
     def get(self, lane_model, s, _is, dt=1./30):
         if self.mode == VelCtl.mode_cst:
             #return self.sp # unfiltered
-            vel_ref = self.ref.run(dt, self.sp)[0]
+            vel_ref = self.ref.run(dt, self.sp, self.max_accel)[0]
             return vel_ref
         elif self.mode == VelCtl.mode_profile:
             profile_sp = self.path.vels[_is]
             profile_acc = self.path.accels[_is]
             profile_jerk = self.path.jerks[_is]
-            vel_ref = self.ref.run(dt, profile_sp)[0]
+            vel_ref = self.ref.run(dt, profile_sp, self.max_accel)[0]
             #return self.path.vels[_is]
             return vel_ref
         else:
@@ -70,7 +73,6 @@ class Guidance:
     mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
     mode_lookahead_cst, mode_lookahead_adaptive = range(2)
     def __init__(self, lookahead=0.4, vel_sp=0.2, path_fname=None):
-        self.set_mode(Guidance.mode_idle)
         self.lookaheads = [CstLookahead(), AdaptiveLookahead()]
         self.lookahead_mode = Guidance.mode_lookahead_cst
         self.lookahead_dist = lookahead
@@ -81,9 +83,11 @@ class Guidance:
         self.vel_ctl = VelCtl(path_fname)
         self.vel_sp = vel_sp
         self.lin_sp, self.ang_sp = 0, 0
-
+        self.est_vel = 0.
+        self.set_mode(Guidance.mode_idle)
     
-    def compute(self, s=float('inf'), _is=0, expl_noise=0.025, dy=0., avoid_obstacles=False):
+    def compute(self, s, _is, est_vel, expl_noise=0.025, dy=0., avoid_obstacles=False):
+        self.est_vel = est_vel
         if self.mode == Guidance.mode_driving and self.lane.is_valid():
             lin = self.vel_ctl.get(self.lane, s, _is)
             if avoid_obstacles:
@@ -103,9 +107,11 @@ class Guidance:
         return lin, ang
 
     def set_mode(self, mode):
-        rospy.loginfo('guidance: setting mode to {}'.format(mode))
+        rospy.loginfo('guidance: setting mode to {} {}'.format(mode, self.est_vel))
         self.mode = mode
-    
+        self.vel_ctl.reset_ref(self.est_vel)
+
+        
     def load_vel_profile(self, path_filename):
         res = self.vel_ctl.load_profile(path_filename)
         return res

@@ -217,7 +217,19 @@ def draw_path_vel_profile(fig, path):
     ax3 = plt.subplot(3,1,3)
     plt.plot(path.jerks)
     plot_utils.decorate(ax3, 'jerk', 'idx', 'm/s3')
+
+def draw_path_vel_profile_chrono(fig, path):
+    ax1 = plt.subplot(3,1,1)
+    plt.plot(path.time, path.vels)
+    plot_utils.decorate(ax1, 'vel', 'time (s)', 'm/s')
+    ax2 = plt.subplot(3,1,2)
+    plt.plot(path.time, path.accels)
+    plot_utils.decorate(ax2, 'accel', 'time (s)', 'm/s2')
+    ax3 = plt.subplot(3,1,3)
+    plt.plot(path.time, path.jerks)
+    plot_utils.decorate(ax3, 'jerk', 'time (s)', 'm/s3')
     
+
 def draw_path_vel_2D(fig, ax, path):
     draw_path_2D(fig, ax, path, path.vels)
     plt.title('2D: velocity along path')

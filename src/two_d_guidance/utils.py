@@ -25,9 +25,11 @@ class LinRef:
         self.K = K; self.order = len(K)
         self.X = np.zeros(self.order+1)
 
-    def run(self, dt, sp):
+    def run(self, dt, sp, max_accel=None):
         self.X[:self.order] += self.X[1:self.order+1]*dt
         e =  np.array(self.X[:self.order]); e[0] -= sp
+        # FIXME - cliping of highest order derivative
+        if max_accel is not None: e[-2] = np.clip(e[-2], -max_accel, max_accel)
         self.X[self.order] = np.sum(e*self.K)
         return self.X
 

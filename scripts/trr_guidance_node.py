@@ -72,8 +72,9 @@ class Node(trr_rpu.PeriodicNode):
     def periodic(self):
         try:
             self.lane_model_sub.get(self.guidance.lane)
+            # abscisse, abs idx, vel, dist to start and finish
             _s, _is, _v, _ds, _df = self.state_est_sub.get()
-            self.guidance.compute(_s, _is, expl_noise=0.)
+            self.guidance.compute(_s, _is, _v, expl_noise=0.)
             if self.guidance.mode != trr_gui.Guidance.mode_idle:
                 self.publisher.publish_cmd(self.guidance.lin_sp, self.guidance.ang_sp)
             self.publisher.publish_status(self.guidance)

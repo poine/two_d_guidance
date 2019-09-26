@@ -12,9 +12,9 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         self.img_bgr = None
         self.green_ctr_detc = trr_vu.ColoredContourDetector(trr_vu.hsv_green_range(), min_area=10)
         self.red_ctr_detc = trr_vu.ColoredContourDetector(trr_vu.hsv_red_range(), min_area=10)
-        cfg_path = "/home/poine/work/roverboard/roverboard_caroline/config/traffic_light_blob_detector_cfg.yaml"
-        self.green_blob_detc = trr_vu.ColoredBlobDetector(trr_vu.hsv_green_range(), cfg_path)
-        self.red_blob_detc = trr_vu.ColoredBlobDetector(trr_vu.hsv_red_range(), cfg_path)
+        #cfg_path = "/home/poine/work/roverboard/roverboard_caroline/config/traffic_light_blob_detector_cfg.yaml"
+        #self.green_blob_detc = trr_vu.ColoredBlobDetector(trr_vu.hsv_green_range(), cfg_path)
+        #self.red_blob_detc = trr_vu.ColoredBlobDetector(trr_vu.hsv_red_range(), cfg_path)
         
         self.set_roi((150, 15), (300, 100))
         self.set_debug_display(TrafficLightPipeline.show_none, False)
@@ -72,13 +72,13 @@ class TrafficLightPipeline(trr_vu.Pipeline):
         elif self.display_mode == TrafficLightPipeline.show_green_blob:
             out_roi = cv2.cvtColor(self.roi_img_bgr, cv2.COLOR_BGR2GRAY)
             out_roi = cv2.cvtColor(out_roi, cv2.COLOR_GRAY2BGR)
-            self.green_blob_detc.draw(out_roi, color=(0, 255, 0))
-            print('keypointds green {}'.format(self.green_blob_detc.keypoints_nb()))
+            #self.green_blob_detc.draw(out_roi, color=(0, 255, 0))
+            #print('keypointds green {}'.format(self.green_blob_detc.keypoints_nb()))
         elif self.display_mode == TrafficLightPipeline.show_red_blob:
             out_roi = cv2.cvtColor(self.roi_img_bgr, cv2.COLOR_BGR2GRAY)
             out_roi = cv2.cvtColor(out_roi, cv2.COLOR_GRAY2BGR)
-            self.red_blob_detc.draw(out_roi, color=(0, 0, 255))
-            print('keypointds red {}'.format(self.red_blob_detc.keypoints_nb()))
+            #self.red_blob_detc.draw(out_roi, color=(0, 0, 255))
+            #print('keypointds red {}'.format(self.red_blob_detc.keypoints_nb()))
         elif self.display_mode == TrafficLightPipeline.show_contours:
             out_roi = cv2.cvtColor(self.roi_img_bgr, cv2.COLOR_BGR2GRAY)
             out_roi = cv2.cvtColor(out_roi, cv2.COLOR_GRAY2BGR)
