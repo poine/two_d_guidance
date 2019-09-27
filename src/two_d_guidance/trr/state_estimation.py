@@ -120,11 +120,11 @@ class StateEstimator:
 
         self.update_landmark(self.path.LM_FINISH, meas_dist_to_finish)
         self.predicted_dist_to_finish = self.lm_pred[self.path.LM_FINISH]
-        if self.lm_res[self.path.LM_FINISH] == float('inf'): self.predicted_dist_to_finish = float('inf')
+        #if self.lm_res[self.path.LM_FINISH] == float('inf'): self.predicted_dist_to_finish = float('inf')
         
         self.update_landmark(self.path.LM_START, meas_dist_to_start)
         self.predicted_dist_to_start = self.lm_pred[self.path.LM_START]
-        if self.lm_res[self.path.LM_START] == float('inf'): self.predicted_dist_to_start = float('inf')
+        #if self.lm_res[self.path.LM_START] == float('inf'): self.predicted_dist_to_start = float('inf')
             
     
     def status(self): return self.sn, self.v
