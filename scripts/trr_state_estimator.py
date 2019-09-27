@@ -29,6 +29,7 @@ class Node(trr_rpu.PeriodicNode):
         print '##service available'
         self.lm_crossed_srv_proxy = rospy.ServiceProxy(srv_topic, two_d_guidance.srv.LandmarkPassed)
 
+        
         self.start_finish_sub = trr_rpu.TrrStartFinishSubscriber(what=name, user_callback=self.on_start_finish)
         self.traffic_light_sub = trr_rpu.TrrTrafficLightSubscriber()
         #odom_topic = '/caroline_robot_hardware/diff_drive_controller/odom' # real
@@ -39,7 +40,15 @@ class Node(trr_rpu.PeriodicNode):
         #self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model', 'state_estimator', user_cbk=self.on_vision_lane)
 
         self.dyn_cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_state_estimatorConfig, self.dyn_cfg_callback)
+        # we expose a service for loading a velocity profile
+        self.lm_service = rospy.Service('StateEstimatorLoadPath', two_d_guidance.srv.GuidanceLoadVelProf, self.on_load_path)
 
+    def on_load_path(self, req):
+        path_filename = ''.join(req.path_filename)
+        print('on_load_path {}'.format(path_filename))
+        err = 0#self.guidance.load_vel_profile(path_filename)
+        return two_d_guidance.srv.GuidanceLoadVelProfResponse(err)
+    
     def dyn_cfg_callback(self, config, level):
         self.estimator.update_k_odom(config['k_odom'])
         return config

@@ -43,14 +43,14 @@ class Node(trr_rpu.PeriodicNode):
         rospy.loginfo(' publishing commands on: {}'.format(cmd_topic))
         self.publisher = Publisher(cmd_topic=cmd_topic)
         # we expose a service for loading a velocity profile
-        self.lm_service = rospy.Service('GuidanceLoadVelProf', two_d_guidance.srv.GuidanceLoadVelProf, self.on_load_vel_profile)
+        self.lm_service = rospy.Service('GuidanceLoadPath', two_d_guidance.srv.GuidanceLoadVelProf, self.on_load_path)
         # dynamic reconfigurable parameters
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.dyn_cfg_callback)
         # 
         self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model')
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
 
-    def on_load_vel_profile(self, req):
+    def on_load_path(self, req):
         path_filename = ''.join(req.path_filename)
         print('on_load_vel_profile {}'.format(path_filename))
         err = self.guidance.load_vel_profile(path_filename)
