@@ -62,7 +62,7 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
         str_of_guid_mode = ['idle', 'stopped', 'driving']
         mode_name, curv = str_of_guid_mode[msg.guidance_mode], msg.poly[1]
         cv2.putText(img_bgr, 'mode: {:s} curv: {:-6.2f}'.format(mode_name, curv), (20, 90), f, h2, c, w)
-
+        
         lin_odom, ang_odom = model.odom_sub.get_vel()
         lin_sp, ang_sp = msg.lin_sp, msg.ang_sp
         lookahead = msg.lookahead_dist

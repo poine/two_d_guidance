@@ -39,8 +39,8 @@ class ImgPublisher(trr_rpu.DebugImgPublisher):
         
             cv2.putText(img_bgr, 's: {:.2f}m ({})'.format(s_est, idx_s), (y0, 90), f, h, c, w)
             cv2.putText(img_bgr, 'v: {:.1f}m/s'.format(v_est), (y0, 140), f, h, c, w)
-            cv2.putText(img_bgr, 'start: {:.1f}m/s'.format(dist_start), (y0, 190), f, h, c, w)
-            cv2.putText(img_bgr, 'finish: {:.1f}m/s'.format(dist_finish), (y0, 240), f, h, c, w)
+            cv2.putText(img_bgr, 'start: {:.1f} m'.format(dist_start), (y0, 190), f, h, c, w)
+            cv2.putText(img_bgr, 'finish: {:.1f} m'.format(dist_finish), (y0, 240), f, h, c, w)
             #cv2.putText(img_bgr, 'lap: {:d}'.format(cur_lap), (y0, 190), f, h, c, w)
         
             p_est_idx, p_est = path.find_point_at_dist_from_idx(0, _d=s_est)
