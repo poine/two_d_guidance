@@ -26,7 +26,7 @@ class VelCtl:
         self.k_curv = 0.5
         # second order reference model driven by input setpoint
         _sats = [4., 25.]  # accel, jerk
-        self.ref = tdg.utils.SecOrdLinRef(omega=6., xi=0.9, sats)
+        self.ref = tdg.utils.SecOrdLinRef(omega=6., xi=0.9, sats=_sats)
         
     def load_profile(self, path_fname):
         self.path = trr_u.TrrPath(path_fname)
