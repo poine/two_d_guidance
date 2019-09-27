@@ -16,9 +16,11 @@ def pt_on_circle(c, r, th):
 #
 #  Linear reference models
 #
-
+# Adaptive Control with a Nested Saturation Reference Model
+# https://pdfs.semanticscholar.org/8b5c/2718be69a651dc3233a934ac05f5edda7ffd.pdf
+#
 class LinRef:
-    ''' Linear Reference Model (with first order integration)'''
+    ''' Nested Saturation Linear Reference Model (with first order integration)'''
     def __init__(self, K, sats=None):
         '''
         K: coefficients of the caracteristic polynomial, in ascending powers order,
@@ -39,8 +41,6 @@ class LinRef:
     def run(self, dt, sp):
         self.X[:self.order] += self.X[1:self.order+1]*dt
         e =  np.array(self.X[:self.order]); e[0] -= sp
-        # FIXME - cliping of highest order derivative
-        #if max_accel is not None: e[-2] = np.clip(e[-2], -max_accel, max_accel)
         if self.sats is None:
             self.X[self.order] = np.sum(e*self.K)
         else:
