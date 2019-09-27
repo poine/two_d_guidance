@@ -24,9 +24,9 @@ class VelCtl:
         # curv mode
         self.min_sp = 1.
         self.k_curv = 0.5
-        self.max_accel = 2.
         # second order reference model driven by input setpoint
-        self.ref = tdg.utils.SecOrdLinRef(omega=4., xi=0.9)
+        _sats = [4., 25.]  # accel, jerk
+        self.ref = tdg.utils.SecOrdLinRef(omega=6., xi=0.9, sats)
         
     def load_profile(self, path_fname):
         self.path = trr_u.TrrPath(path_fname)
@@ -38,13 +38,13 @@ class VelCtl:
     def get(self, lane_model, s, _is, dt=1./30):
         if self.mode == VelCtl.mode_cst:
             #return self.sp # unfiltered
-            vel_ref = self.ref.run(dt, self.sp, self.max_accel)[0]
+            vel_ref = self.ref.run(dt, self.sp)[0]
             return vel_ref
         elif self.mode == VelCtl.mode_profile:
             profile_sp = self.path.vels[_is]
             profile_acc = self.path.accels[_is]
             profile_jerk = self.path.jerks[_is]
-            vel_ref = self.ref.run(dt, profile_sp, self.max_accel)[0]
+            vel_ref = self.ref.run(dt, profile_sp)[0]
             #return self.path.vels[_is]
             return vel_ref
         else:
