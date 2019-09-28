@@ -17,10 +17,10 @@ import two_d_guidance.trr.utils as trr_u
 #   -curv:
 class VelCtl:
     mode_cst, mode_profile, mode_curv, mode_nb = range(4)
-    def __init__(self, path_fname):
+    def __init__(self, path_fname, speed=1.5):
         self.load_profile(path_fname)
         self.mode = VelCtl.mode_cst#VelCtl.mode_curv#
-        self.sp = 1.5
+        self.sp = speed
         # curv mode
         self.min_sp = 1.
         self.k_curv = 0.5
@@ -72,7 +72,7 @@ class AdaptiveLookahead:
 class Guidance:
     mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
     mode_lookahead_cst, mode_lookahead_adaptive = range(2)
-    def __init__(self, lookahead=0.4, vel_sp=0.2, path_fname=None):
+    def __init__(self, lookahead=0.4, vel_sp=1.5, path_fname=None):
         self.lookaheads = [CstLookahead(), AdaptiveLookahead()]
         self.lookahead_mode = Guidance.mode_lookahead_cst
         self.lookahead_dist = lookahead
@@ -80,11 +80,12 @@ class Guidance:
         self.lane = trr_u.LaneModel()
         self.carrot = [self.lookahead_dist, 0]
         self.R = np.inf
-        self.vel_ctl = VelCtl(path_fname)
-        self.vel_sp = vel_sp
+        self.vel_ctl = VelCtl(path_fname, vel_sp)
         self.lin_sp, self.ang_sp = 0, 0
         self.est_vel = 0.
         self.set_mode(Guidance.mode_idle)
+        self.understeering_comp = 0
+        self.compensate = True
     
     def compute(self, s, _is, est_vel, expl_noise=0.025, dy=0., avoid_obstacles=False):
         self.est_vel = est_vel
@@ -97,9 +98,11 @@ class Guidance:
             self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
             delay = rospy.Time.now().to_sec() - self.lane.stamp.to_sec()
             self.carrot = [self.lookahead_dist, self.lane.get_y(self.lookahead_dist)+dy]
-            #self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
+            if self.compensate:
+                self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
             self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
             lin, ang = lin, lin/self.R
+            ang += self.understeering_comp * lin*lin/self.R
             ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
         else:
             lin, ang = 0., 0.

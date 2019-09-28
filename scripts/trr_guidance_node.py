@@ -64,7 +64,9 @@ class Node(trr_rpu.PeriodicNode):
         #self.guidance.lookaheads[1].set_time(config['lookahead_time'])
         self.guidance.lookahead_mode = config['lookahead_mode']
         self.guidance.vel_ctl.sp = config['vel_sp']
+        self.guidance.understeering_comp = config['understeering_comp']
         self.guidance.vel_ctl.k_curv = config['vel_k_curve']
+        self.guidance.compensate = config['compute_time_comp']
         self.guidance.vel_ctl.mode = config['vel_ctl_mode']
         return config
 
