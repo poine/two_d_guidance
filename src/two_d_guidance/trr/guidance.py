@@ -59,8 +59,8 @@ class CstLookahead:
 
 class AdaptiveLookahead:
     def __init__(self):
-        self.v0, self.v1 = 1., 4.
-        self.d0, self.d1 = 0.6, 1.5
+        self.v0, self.v1 = 2., 4.
+        self.d0, self.d1 = 1.2, 2.0
         self.k =  (self.d1-self.d0)/(self.v1-self.v0)
     def set_dist(self, _d): pass
     def set_time(self, _t): pass #self.t = _t
@@ -97,7 +97,7 @@ class Guidance:
             self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
             delay = rospy.Time.now().to_sec() - self.lane.stamp.to_sec()
             self.carrot = [self.lookahead_dist, self.lane.get_y(self.lookahead_dist)+dy]
-            self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
+            #self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
             self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
             lin, ang = lin, lin/self.R
             ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
