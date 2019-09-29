@@ -257,7 +257,6 @@ class BirdEyeTransformer:
         xs = np.linspace(l0, l1, 20); ys = lane_model.get_y(xs)
         pts_lfp = np.array([[x, y, 0] for x, y in zip(xs, ys)])
         pts_img = self.lfp_to_unwarped(cam, pts_lfp)
-        #pdb.set_trace()
         for i in range(len(pts_img)-1):
             try:
                 #print(tuple(pts_img[i].squeeze().astype(int)), tuple(pts_img[i+1].squeeze().astype(int)))
@@ -567,6 +566,14 @@ class BinaryThresholder:
             
     def set_offset(self, offset):
         self.offset_val = -offset
+
+    def set_threshold(self, thresh): self.thresh_val = thresh
+
+    def process_bgr_noflt(self, bgr_img, birdeye_mode=True):
+        gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray_img, (9, 9), 0)
+        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
+        return self.threshold
         
     def process_bgr(self, img, birdeye_mode=True):
         blue_img = img[:, :, 0]
@@ -615,7 +622,8 @@ class HoughLinesFinder:
         self.use_mask=True
         
     def process(self, img, minval=100, maxval=200):
-        self.edges = cv2.Canny(img, minval, maxval, apertureSize=3, L2gradient=False)
+        blurred = cv2.GaussianBlur(img, (9, 9), 0)
+        self.edges = cv2.Canny(blurred, minval, maxval, apertureSize=3, L2gradient=False)
         if self.use_mask: cv2.fillPoly(self.edges, pts =self.mask, color=(0))
         rho_acc, theta_acc = 6, np.deg2rad(1)
         lines, threshold = 80, 30
@@ -625,7 +633,7 @@ class HoughLinesFinder:
         if self.lines is None or len(self.lines) == 0:
             self.vlines = np.array([]); return
         
-        print('found {} lines'.format(len(self.lines)))
+        #print('found {} lines'.format(len(self.lines)))
         self.vlines = []
         dth=45.
         for line in self.lines:
@@ -635,7 +643,7 @@ class HoughLinesFinder:
                angle > -np.deg2rad(90+dth) and angle < -np.deg2rad(dth-30) :
                 self.vlines.append(line)
         self.vlines = np.array(self.vlines)
-        print('kept {} vlines'.format(len(self.vlines)))
+        #print('kept {} vlines'.format(len(self.vlines)))
         #pdb.set_trace()
 
     def has_lines(self): return self.vlines is not None and len(self.vlines) > 0

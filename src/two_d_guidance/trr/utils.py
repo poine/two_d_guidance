@@ -77,6 +77,7 @@ class LaneModel:
     # center line as polynomial
     # y = an.x^n + ...
     def __init__(self):
+        self.order = 3
         self.coefs = [0., 0., 0., 0.01, 0.05]
         self.stamp = None
         self.valid = False
@@ -84,6 +85,10 @@ class LaneModel:
 
     def is_valid(self): return self.valid
     def set_valid(self, v): self.valid = v
+
+    def set_invalid(self):
+        self.valid = False
+        self.coefs = np.full(self.order+1, np.nan)
         
     def get_y(self, x):
         return np.polyval(self.coefs, x)

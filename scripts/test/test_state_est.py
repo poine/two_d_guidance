@@ -7,6 +7,7 @@ import mpl_toolkits.axisartist.floating_axes as floating_axes
 
 import two_d_guidance as tdg
 import two_d_guidance.trr.state_estimation as trr_se
+import two_d_guidance.trr.utils as trr_u
 import two_d_guidance.plot_utils as pu
 import pdb    
 
@@ -192,8 +193,8 @@ def test_vision_curvature(lane_coefs, idx):
 
 def process_vision_log(vision_pipe_filename='/tmp/pipe_run.npz'):
     #path_fname = '/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz'
-    path_fname = '/home/poine/work/overlay_ws/src/two_d_guidance/paths/vedrines/track_trr.npz'
-    _path = trr_se.StateEstPath(path_fname)
+    path_fname = '/home/poine/work/overlay_ws/src/two_d_guidance/paths/vedrines/track_trr_0.npz'
+    _path = trr_u.TrrPath(path_fname)
     #plot_path(p)
     print('loading vision log  from {}'.format(vision_pipe_filename))
     data =  np.load(vision_pipe_filename)

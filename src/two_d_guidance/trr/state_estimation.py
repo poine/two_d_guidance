@@ -59,7 +59,6 @@ class StateEstimator:
 
     def load_path(self, path_filename):
         rospy.loginfo(' loading path: {}'.format(path_filename))
-        #self.path = StateEstPath(path_filename)
         self.path = trr_u.TrrPath(path_filename)
         self.path.report()
 
@@ -68,10 +67,12 @@ class StateEstimator:
     def initialize(self, s0):
         self.sn = s0
         self.idx_sn, _ = self.path.find_point_at_dist_from_idx(0, _d=self.sn)
-     
+
+    # increments abscisse taking care of periodic rollover
+    # check landmarks crossing
     def _update_s(self, ds):
-        self.s += ds
         self.prev_sn = self.sn
+        self.s += ds
         self.sn = self._norm_s(self.s)
         self.idx_sn, _ = self.path.find_point_at_dist_from_idx(0, _d=self.sn)
         
@@ -131,20 +132,3 @@ class StateEstimator:
 
     def dist_to_start(self): return self.predicted_dist_to_start
         
-    
-import matplotlib.pyplot as plt
-def main(args):
-    path = StateEstPath('/home/poine/work/overlay_ws/src/two_d_guidance/paths/demo_z/track_trr_real.npz')
-    plt.plot(path.dists)
-    plt.figure()
-    plt.plot(path.points[:,0])
-    plt.figure()
-    plt.plot(path.points[:,1])
-    plt.figure()
-    plt.plot(path.curvatures[:])
-    
-    plt.show()
-
-
-if __name__ == '__main__':
-    main(sys.argv)

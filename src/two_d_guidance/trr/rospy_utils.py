@@ -401,17 +401,30 @@ class DebugImgPublisher:
         self.image_pub = CompressedImgPublisher(cam=None, img_topic=topic_sink)
 
         self.img, self.compressed_img = None, None
-        img_src_topic = cam_name + '/image_raw/compressed'
-        self.img_sub = rospy.Subscriber(img_src_topic, sensor_msgs.msg.CompressedImage, self.img_cbk,  queue_size = 1)
-        rospy.loginfo(' subscribed to ({})'.format(img_src_topic))
+        self.img_src_topic = cam_name + '/image_raw/compressed'
+        #self.img_sub = rospy.Subscriber(self.img_src_topic, sensor_msgs.msg.CompressedImage, self.img_cbk,  queue_size = 1)
+        self.img_sub = None # in odred to keep network traffic down, we subscribe only when someone is listening to us
+        self.compressed_img = None
+        rospy.loginfo(' will subscribe to ({})'.format(self.img_src_topic))
 
     def img_cbk(self, msg):
         self.compressed_img = np.fromstring(msg.data, np.uint8)
 
+    
+        
     def publish(self, model, user_data):
         n_subscriber = self.image_pub.image_pub.get_num_connections()
         # don't bother drawing and publishing when no one is listening
-        if n_subscriber <= 0: return
+        if n_subscriber <= 0:
+            if self.img_sub is not None:
+                self.img_sub.unregister()
+                self.img_sub = None
+                self.compressed_img = None
+            return 
+        else:
+            if self.img_sub is None:
+                self.img_sub = rospy.Subscriber(self.img_src_topic, sensor_msgs.msg.CompressedImage, self.img_cbk,  queue_size = 1)
+
         if self.compressed_img is not None:
             self.img_bgr = cv2.imdecode(self.compressed_img, cv2.IMREAD_COLOR)
             self._draw(self.img_bgr, model, user_data)
