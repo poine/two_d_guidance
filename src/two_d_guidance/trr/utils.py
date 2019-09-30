@@ -327,7 +327,7 @@ class LaneModel:
     # center line as polynomial
     # y = an.x^n + ...
     def __init__(self):
-        self.order = =3
+        self.order = 3
         self.coefs = [0., 0., 0., 0.01, 0.05]
         self.stamp = None
         self.valid = False
