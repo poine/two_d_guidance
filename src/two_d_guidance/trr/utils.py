@@ -39,15 +39,28 @@ class TrrPath(tdg.path.Path):
             self.vels = data['vels']
             self.accels = data['accels']
             self.jerks = data['jerks']
+            self.offsets = data['offsets']
         except KeyError:
-            print(' -no vel/acc/jerk in archive, setting them to zero')
+            print(' -no vel/acc/jerk/offsets in archive, setting them to zero')
             self.vels   = v*np.ones(len(self.points))
             self.accels = np.zeros(len(self.points))
             self.jerks  = np.zeros(len(self.points))
+            self.offsets= np.zeros(len(self.points))
+
+        try:
+            self.track_points = data['track_points']
+            self.speed_points = data['speed_points']
+            self.offset_points = data['offset_points']
+        except KeyError:
+            print(' -no track/speed/offset definition, using path as default')
+            self.track_points = np.array(data['points'])
+            self.speed_points = [[0.0, 2.0]]
+            self.offset_points = []
+            
         try:
             self.lm_s = data['lm_s']  # landmark abscisses
         except KeyError:
-            print(' no landmark abscisses in path, using defaults')
+            print(' -no landmark abscisses in path, using defaults')
             self.lm_s = [0., 16.66] # vedrines
         self.lm_idx, self.lm_points = [], []
         for _lm_s in self.lm_s:
@@ -56,28 +69,265 @@ class TrrPath(tdg.path.Path):
             self.lm_points.append(_p) 
             
         self.len = self.dists[-1] - self.dists[0]
+        self.compute_time()
             
     def save(self, filename):
         print('saving path to {}'.format(filename))
-        np.savez(filename, points=self.points, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, jerks=self.jerks, lm_s=self.lm_s)
+        np.savez(filename, points=self.points, offsets=self.offsets, headings=self.headings, curvatures=self.curvatures, dists=self.dists, vels=self.vels, accels=self.accels, track_points=self.track_points, speed_points=self.speed_points, offset_points=self.offset_points, jerks=self.jerks, lm_s=self.lm_s)
 
+    def build_path_only(self):
+        self.points = np.array(self.track_points)
+        self.compute_headings()
+        self.offsets = np.zeros(len(self.points))
+        for offset_position, offset_size, offset_length in self.offset_points:
+            first_index = int((offset_position - offset_length / 2) * 100)
+            length = int(offset_length * 100)
+            if first_index + length >= len(self.points):
+                first_index -= len(self.points)
+            for i in range(length):
+                offset = offset_size * (math.cos(math.pi * i * 2 / length - math.pi) + 1) * 0.5
+                self.offsets[first_index + i] += offset
+                self.points[first_index + i, 0] -= math.sin(self.headings[first_index + i]) * offset
+                self.points[first_index + i, 1] += math.cos(self.headings[first_index + i]) * offset
+                
+    def compute_vels_1(self):
+        # TODO: rewrite vels generation code from here *************************
+        speed_points = sorted(self.speed_points, reverse=True)
+        self.vels = np.zeros(len(self.points))
+        index = len(self.vels)
+        for position, value in speed_points: # Speed is set from the end to the start
+            position = int(position * 100)
+            self.vels[position:index] = value
+            index = position
+        forward_vels = self.vels
+        forward_vels = filter(forward_vels, self.dists)[:,0]
+        reverse_vels = np.flip(self.vels, 0)
+        reverse_vels = filter(reverse_vels, np.flip(self.dists, 0) * -1)[:,0]
+        self.vels = np.minimum(self.vels, np.minimum(forward_vels, np.flip(reverse_vels, 0)))
+        #self.vels = filter(self.vels, self.dists)[:,0]
+        # TODO: full rewrite of vels generation code needed to here ***************************
+
+    def compute_speed_profile(self, max_vels, accel_limits, jerk_limits):
+        '''
+        WORK IN PROGRESS
+        '''
+        result = np.zeros(len(max_vels))
+        v, a = max_vels[0], 0
+        for i in range(len(max_vels)):
+            dt = (self.dists[i] - self.dists[i - 1]) / v
+            if dt == 0.:
+                result[i] = v
+                continue
+            if v <= max_vels[i]: # Speed up
+                old_v = v
+                old_a = a
+                a = a + jerk_limits[1] * dt
+                if a > accel_limits[1]: a = accel_limits[1]
+                v = v + a * dt
+                if v > max_vels[i]: v = max_vels[i]
+                result[i] = v
+                a = (v - old_v) / dt
+                j = (a - old_a) / dt
+                if j < jerk_limits[0]:
+                    a = 0
+                    #while k >= 0 andj = jerk_limits[0]
+                    
+            else: # Slow down
+                pdb.set_trace()
+                result[i] = max_vels[i]
+                a = 0
+                v = result[i]
+                       
+        return result
+
+    
+    def compute_vels_fail(self):
+        '''
+        WORK IN PROGRESS
+        '''
+        self.vels = np.zeros(len(self.points))
+        accel_limits = [-4, 5]
+        jerk_limits = [-10, 20]
+        speed_points = sorted(self.speed_points, reverse=False)
+        v_i = speed_points[0, 1]
+        a_i = 0
+        for i in range(len(speed_points)):
+            index_i = int(speed_points[i, 0] * 100)
+            d_i = self.dists[index_i]
+            v_max = speed_points[i, 1]
+            if i + 1 < len(speed_points):
+                index_f = int(speed_points[i + 1, 0] * 100)
+                d_f = self.dists[index_f]
+                vmax_f = speed_points[i + 1, 1]
+            else:
+                d_f = self.dists[-1]
+                vmax_f = speed_points[0, 1]
+
+            if vmax_f > v_i: # Speed up
+                self.fill_speed_up_profile(v_i, d_i, v_max) 
+                
+        for position, value in speed_points: # Speed is set from the end to the start
+            position = int(position * 100)
+            max_vels[position:index] = value
+            index = position
+        self.vels = self.compute_speed_profile(max_vels, accel_limits, jerk_limits)
+
+    def _update_dynamics(self, i, max_vel, accel_limits, jerk_limits):
+        '''
+        WORK IN PROGRESS
+        '''
+        old_v = self.vels[i -1]
+        dt = (self.dists[i] - self.dists[i - 1]) / old_v
+        if dt == 0:
+            self.jerks[i] = self.jerks[i - 1]
+            self.accels[i] = self.accels[i - 1]
+            self.vels[i] = self.vels[i - 1]
+        else:
+            old_a = self.accels[i - 1]
+            j = jerk_limits[1]
+            a = old_a + j * dt
+            if a > accel_limits[1]:
+                a = accel_limits[1]
+                j = (a - old_a) / dt
+            v = old_v + a * dt
+            if v > max_vel:
+                a = (max_vel - old_v) / dt
+                j = (a - old_a) / dt
+                if a >= accel_limits[0] and j >= jerk_limits[0]:
+                    v = max_vel
+            self.jerks[i] = j
+            self.accels[i] = a
+            self.vels[i] = v
+
+    def _reverse_dynamics(self, i, accel_limits, jerk_limits):
+        '''
+        WORK IN PROGRESS
+        '''
+        '''
+        Compute vel, accel, jerk for point i based on next point.
+        All equations are reversed to get the best slow down to
+        the next point.
+        '''
+        dd = self.dists[i + 1] - self.dists[i]
+        if dd == 0.:
+            self.jerks[i] = self.jerks[i + 1]
+            self.accels[i] = self.accels[i + 1]
+            self.vels[i] = self.vels[i + 1]
+            return True
+        else:
+            #TODO: PB car dernier a = 0
+            delta = self.vels[i + 1] * self.vels[i + 1] - 4 * self.accels[i + 1] * dd
+            dt = (math.sqrt(delta) - self.vels[i + 1]) / (-2. * self.accels[i + 1])
+            print dt
+            v = self.vels[i + 1] - self.accels[i + 1] * dt
+            if v > self.vels[i]: # TODO Wrong!
+                self.accels[i + 1] = (self.vels[i + 1] - self.vels[i]) / dt
+                self.accels[i] = self.accels[i + 1] - self.jerks[i + 1] * dt
+                self.jerks[i] = 0
+                return False
+            else:
+                a = self.accels[i + 1] - self.jerks[i + 1] * dt
+                if a < accel_limits[0]:
+                    a = accel_limits[0]
+                    self.jerks[i + 1] = (self.accels[i + 1] - a) / dt
+                self.jerks[i] = jerk_limits[0]
+                self.accels[i] = a
+                self.vels[i] = v
+                return True
+            
+    def compute_vels(self):
+        '''
+        WORK IN PROGRESS
+        '''
+        accel_limits = [-4, 5]
+        jerk_limits = [-10, 20]
+        speed_points = sorted(self.speed_points, reverse=True)
+        self.accels = np.zeros(len(self.points))
+        self.jerks = np.zeros(len(self.points))
+        self.vels = np.zeros(len(self.points))
+        max_vels = np.zeros(len(self.points))
+        index = len(max_vels)
+        for position, value in speed_points: # Speed is set from the end to the start
+            position = int(position * 100)
+            max_vels[position:index] = value
+            index = position
+        self.vels[-1] = max_vels[-1]
+        self.vels[0] = max_vels[0]
+        for i in range(len(max_vels)):
+            self._update_dynamics(i, max_vels[i], accel_limits, jerk_limits)
+            if self.vels[i] > max_vels[i]:
+                self.vels[i] = max_vels[i]
+                self.jerks[i] = jerk_limits[0]
+                self.accels[i] = 0
+                j = i - 1
+                while j >= 0:
+                    clipped = self._reverse_dynamics(j, accel_limits, jerk_limits)
+                    if not clipped:
+                        break
+                    j -= 1
+                        
+                    
+    def compute_all(self):
+        self.build_path_only()
+        self.compute_headings()
+        self.compute_curvatures()
+        self.compute_dists()
+        self.len = self.dists[-1] - self.dists[0]
+        self.compute_vels_1()
+        self.compute_time()
+        self.accels = np.zeros(len(self.points))
+        self.accels[0] = (self.vels[0] - self.vels[-1]) / (np.linalg.norm(self.points[0] - self.points[-1]) / self.vels[-1])
+        for i in range(1, len(self.vels)):
+            self.accels[i] = (self.vels[i] - self.vels[i - 1]) / (self.time[i] - self.time[i - 1])
+        self.jerks = np.zeros(len(self.points))
+        self.jerks[0] = (self.accels[0] - self.accels[-1]) / (np.linalg.norm(self.points[0] - self.points[-1]) / self.vels[-1])
+        for i in range(1, len(self.accels)):
+            self.jerks[i] = (self.accels[i] - self.accels[i - 1]) / (self.time[i] - self.time[i - 1])
+
+
+    def compute_time(self):
+        # integrate
+        self.time = np.zeros(len(self.points))
+        for i in range(1, len(self.time)):
+            d = self.dists[i]-self.dists[i-1]
+            self.time[i] = self.time[i-1] + d/self.vels[i-1]
+
+            
     def report(self):
-        rospy.loginfo(' path len {:.2f} m'.format(self.len))
+        rospy.loginfo(' lap time: {:.2f} s'.format(self.time[-1]))
+        rospy.loginfo(' path len {:.2f} m, {} points'.format(self.len, len(self.dists)))
+        rospy.loginfo(' path control points {} speed, {} deviation'.format(len(self.speed_points), len(self.offset_points)))
         rospy.loginfo(' path start {} (dist {:.2f}) '.format(self.points[0], self.dists[0]))
         rospy.loginfo(' path finish {}(dist {:.2f})'.format(self.points[-1], self.dists[-1]))
         rospy.loginfo('  lm_start idx {} pos {} dist {:.2f}'.format(self.lm_idx[self.LM_START], self.lm_points[self.LM_START], self.lm_s[self.LM_START]))
         rospy.loginfo('  lm_finish idx {} pos {} dist {:.2f}'.format(self.lm_idx[self.LM_FINISH], self.lm_points[self.LM_FINISH], self.lm_s[self.LM_FINISH]))
-        rospy.loginfo('  vels min/avg/max {:.1f} {:.1f} {:.1f} m/s'.format(np.min(self.vels), np.mean(self.vels), np.max(self.vels)))
-        rospy.loginfo('  accels min/avg/max {:.1f} {:.1f} {:.1f} m/s'.format(np.min(self.accels), np.mean(self.accels), np.max(self.accels)))
+        rospy.loginfo('  vels min/avg/max {:.1f} {:.1f} {:.1f} m/s'.format(np.min(self.vels), self.dists[-1] / self.time[-1], np.max(self.vels)))
+        rospy.loginfo('  accels min/avg/max {:.1f} {:.1f} {:.1f} m/s^2'.format(np.min(self.accels), np.mean(self.accels), np.max(self.accels)))
 
         
+#
+# Velocity profile
+#
+# Same values as used in guidance
+def filter(vel_sps, dists, omega=6., xi=0.9):
+    # second order reference model driven by input setpoint
+    _sats = [4., 25.]  # accel, jerk
+    ref = tdg.utils.SecOrdLinRef(omega=omega, xi=xi, sats=_sats)
+    out = np.zeros((len(vel_sps), 3))
+    # run ref
+    out[0, 0] = vel_sps[0]; ref.reset(out[0])
+    for i in range(1,len(vel_sps)):
+        dt = (dists[i] - dists[i - 1]) / out[i - 1, 0]
+        out[i] = ref.run(dt, vel_sps[i])
+    return out
+
 
 import matplotlib.pyplot as plt
 class LaneModel:
     # center line as polynomial
     # y = an.x^n + ...
     def __init__(self):
-        self.order = 3
+        self.order = =3
         self.coefs = [0., 0., 0., 0.01, 0.05]
         self.stamp = None
         self.valid = False
@@ -89,7 +339,7 @@ class LaneModel:
     def set_invalid(self):
         self.valid = False
         self.coefs = np.full(self.order+1, np.nan)
-        
+  
     def get_y(self, x):
         return np.polyval(self.coefs, x)
 

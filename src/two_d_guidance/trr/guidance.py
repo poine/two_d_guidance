@@ -30,6 +30,7 @@ class VelCtl:
         
     def load_profile(self, path_fname):
         self.path = trr_u.TrrPath(path_fname)
+        rospy.loginfo('Loaded path file: {}'.format(path_fname))
         self.path.report()
 
     def reset_ref(self, v0):
@@ -59,8 +60,8 @@ class CstLookahead:
 
 class AdaptiveLookahead:
     def __init__(self):
-        self.v0, self.v1 = 2., 4.
-        self.d0, self.d1 = 1.2, 2.0
+        self.v0, self.v1 = 2.5, 5.
+        self.d0, self.d1 = 1.2, 2.5
         self.k =  (self.d1-self.d0)/(self.v1-self.v0)
     def set_dist(self, _d): pass
     def set_time(self, _t): pass #self.t = _t
@@ -90,13 +91,15 @@ class Guidance:
     def compute(self, s, _is, est_vel, expl_noise=0.025, dy=0., avoid_obstacles=False):
         self.est_vel = est_vel
         if self.mode == Guidance.mode_driving and self.lane.is_valid():
-            lin = self.vel_ctl.get(self.lane, s, _is)
-            if avoid_obstacles:
-                if s > 15.5 and s < 16.: dy += 0.25
-                elif s > 0.5 and s < 1.: dy -= 0.25
+            delay = rospy.Time.now().to_sec() - self.lane.stamp.to_sec()
+            lin = self.vel_ctl.get(self.lane, s, _is, dt=delay)
+
+            # TODO : utiliser le tableau des decalages. replacer la carotte plutot qu'un dy ?
+            # TODO: check _is
+            dy += self.vel_ctl.path.offsets[_is]
+            #print "_is: ", _is, "   dy: ", dy
             self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
             self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
-            delay = rospy.Time.now().to_sec() - self.lane.stamp.to_sec()
             self.carrot = [self.lookahead_dist, self.lane.get_y(self.lookahead_dist)+dy]
             if self.compensate:
                 self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
@@ -120,7 +123,7 @@ class Guidance:
         return res
 
 
-def _time_compensate(carrot, previous_speed, previous_ang, delay=1/30):
+def _time_compensate(carrot, previous_speed, previous_ang, delay=1./30):
     if previous_ang == 0 or previous_speed == 0:
         carrot[0] -= previous_speed * delay
         return carrot
