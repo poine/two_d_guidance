@@ -46,7 +46,8 @@ class Node(trr_rpu.PeriodicNode):
     def on_load_path(self, req):
         path_filename = ''.join(req.path_filename)
         print('on_load_path {}'.format(path_filename))
-        err = 0#self.guidance.load_vel_profile(path_filename)
+        self.estimator.load_path(path_filename)
+        err = 0
         return two_d_guidance.srv.GuidanceLoadVelProfResponse(err)
     
     def dyn_cfg_callback(self, config, level):
