@@ -35,7 +35,7 @@ class LinRef:
             for i in range(0, len(self.M)-1):
                 self.M[len(self.M)-2-i] /= np.prod(self.M[len(self.M)-1-i:])
             self.CM = np.cumprod(self.M[::-1])[::-1]
-            print 'M', self.M, 'CM', self.CM
+            print('M', self.M, 'CM', self.CM)
         self.X = np.zeros(self.order+1)
 
     def run(self, dt, sp):
