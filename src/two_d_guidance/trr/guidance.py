@@ -43,14 +43,17 @@ class VelCtl:
             return vel_ref
         elif self.mode == VelCtl.mode_profile:
             profile_sp = self.path.vels[_is]
-            if abs(profile_sp - est_vel) > 0.5: # replace est_vel by self.ref.X[0] ?
-                self.reset(est_vel)
+            if True:
                 vel_ref = self.ref.run(dt, profile_sp)[0]
             else:
-                vel_ref = profile_sp
-                self.ref.X[0] = vel_ref
-                self.ref.X[1] = self.path.accels[_is]
-                self.ref.X[2] = self.path.jerks[_is]
+                if abs(profile_sp - est_vel) > 0.5: # replace est_vel by self.ref.X[0] ?
+                    self.reset_ref(est_vel)
+                    vel_ref = self.ref.run(dt, profile_sp)[0]
+                else:
+                    vel_ref = profile_sp
+                    self.ref.X[0] = vel_ref
+                    self.ref.X[1] = self.path.accels[_is]
+                    self.ref.X[2] = self.path.jerks[_is]
             return vel_ref
         else:
             curv = lane_model.coefs[1]
