@@ -36,17 +36,24 @@ class VelCtl:
     def reset_ref(self, v0):
         self.ref.reset(np.array([v0, 0, 0]))
         
-    def get(self, lane_model, s, _is, dt=1./30):
+    def get(self, lane_model, s, _is, est_vel, dt=1./30):
         if self.mode == VelCtl.mode_cst:
             #return self.sp # unfiltered
             vel_ref = self.ref.run(dt, self.sp)[0]
             return vel_ref
         elif self.mode == VelCtl.mode_profile:
             profile_sp = self.path.vels[_is]
-            profile_acc = self.path.accels[_is]
-            profile_jerk = self.path.jerks[_is]
-            vel_ref = self.ref.run(dt, profile_sp)[0]
-            #return self.path.vels[_is]
+            if True:
+                vel_ref = self.ref.run(dt, profile_sp)[0]
+            else:
+                if abs(profile_sp - est_vel) > 0.5: # replace est_vel by self.ref.X[0] ?
+                    self.reset_ref(est_vel)
+                    vel_ref = self.ref.run(dt, profile_sp)[0]
+                else:
+                    vel_ref = profile_sp
+                    self.ref.X[0] = vel_ref
+                    self.ref.X[1] = self.path.accels[_is]
+                    self.ref.X[2] = self.path.jerks[_is]
             return vel_ref
         else:
             curv = lane_model.coefs[1]
@@ -82,7 +89,8 @@ class Guidance:
         self.carrot = [self.lookahead_dist, 0]
         self.R = np.inf
         self.vel_ctl = VelCtl(path_fname, vel_sp)
-        self.lin_sp, self.ang_sp = 0, 0
+        self.calculated_ang_sp = 0.
+        self.lin_sp, self.ang_sp = 0., 0.
         self.est_vel = 0.
         self.set_mode(Guidance.mode_idle)
         self.understeering_comp = 0
@@ -92,19 +100,16 @@ class Guidance:
         self.est_vel = est_vel
         if self.mode == Guidance.mode_driving and self.lane.is_valid():
             delay = rospy.Time.now().to_sec() - self.lane.stamp.to_sec()
-            lin = self.vel_ctl.get(self.lane, s, _is, dt=delay)
-
-            # TODO : utiliser le tableau des decalages. replacer la carotte plutot qu'un dy ?
-            # TODO: check _is
+            lin = self.vel_ctl.get(self.lane, s, _is, est_vel) #, dt=delay)
             dy += self.vel_ctl.path.offsets[_is]
-            #print "_is: ", _is, "   dy: ", dy
             self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
             self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
             self.carrot = [self.lookahead_dist, self.lane.get_y(self.lookahead_dist)+dy]
             if self.compensate:
-                self.carrot = _time_compensate(self.carrot, self.lin_sp, self.ang_sp, delay=delay)
+                self.carrot = _time_compensate(self.carrot, self.lin_sp, self.calculated_ang_sp, delay=delay)
             self.R = (np.linalg.norm(self.carrot)**2)/(2*self.carrot[1])
             lin, ang = lin, lin/self.R
+            self.calculated_ang_sp = ang
             ang += self.understeering_comp * lin*lin/self.R
             ang += expl_noise*np.sin(0.5*rospy.Time.now().to_sec())
         else:

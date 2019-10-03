@@ -21,8 +21,8 @@ class Contour2Pipeline(trr_vu.Pipeline):
         self.cnt_max_be = None
         
     def init_masks(self): # FIXME, compute that from be params
-        y0, x1, x2, y3 = 81, 346, 452, 80
-        self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, 0], [x2,0], [self.cam.w, y3],  [self.cam.w, 0] ] )
+        y0, x1, x2, y3, y4 = 100, 346, 452, 100, 30
+        self.be_mask_roi = np.array( [ [0,0], [0, y0], [x1, y4], [x2, y4], [self.cam.w, y3],  [self.cam.w, 0] ] )
         self.be_mask_noroi = self.be_mask_roi + self.tl
         y0, x1, y1, x2, y3 = 350, 150, self.cam.h-20, 600, 350
         self.car_mask = np.array( [ [0, self.cam.h], [0, y0], [x1, y1], [x2,y1], [self.cam.w, y3],  [self.cam.w, self.cam.h] ] )

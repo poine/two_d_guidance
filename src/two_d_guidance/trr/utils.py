@@ -91,7 +91,10 @@ class TrrPath(tdg.path.Path):
                 self.points[first_index + i, 1] += math.cos(self.headings[first_index + i]) * offset
                 
     def compute_vels_1(self):
-        # TODO: rewrite vels generation code from here *************************
+        '''
+        Result is quite acceptable with simple configurations.
+        CPU time efficient
+        '''
         speed_points = sorted(self.speed_points, reverse=True)
         self.vels = np.zeros(len(self.points))
         index = len(self.vels)
@@ -105,76 +108,13 @@ class TrrPath(tdg.path.Path):
         reverse_vels = filter(reverse_vels, np.flip(self.dists, 0) * -1)[:,0]
         self.vels = np.minimum(self.vels, np.minimum(forward_vels, np.flip(reverse_vels, 0)))
         #self.vels = filter(self.vels, self.dists)[:,0]
-        # TODO: full rewrite of vels generation code needed to here ***************************
-
-    def compute_speed_profile(self, max_vels, accel_limits, jerk_limits):
-        '''
-        WORK IN PROGRESS
-        '''
-        result = np.zeros(len(max_vels))
-        v, a = max_vels[0], 0
-        for i in range(len(max_vels)):
-            dt = (self.dists[i] - self.dists[i - 1]) / v
-            if dt == 0.:
-                result[i] = v
-                continue
-            if v <= max_vels[i]: # Speed up
-                old_v = v
-                old_a = a
-                a = a + jerk_limits[1] * dt
-                if a > accel_limits[1]: a = accel_limits[1]
-                v = v + a * dt
-                if v > max_vels[i]: v = max_vels[i]
-                result[i] = v
-                a = (v - old_v) / dt
-                j = (a - old_a) / dt
-                if j < jerk_limits[0]:
-                    a = 0
-                    #while k >= 0 andj = jerk_limits[0]
-                    
-            else: # Slow down
-                pdb.set_trace()
-                result[i] = max_vels[i]
-                a = 0
-                v = result[i]
-                       
-        return result
 
     
-    def compute_vels_fail(self):
-        '''
-        WORK IN PROGRESS
-        '''
-        self.vels = np.zeros(len(self.points))
-        accel_limits = [-4, 5]
-        jerk_limits = [-10, 20]
-        speed_points = sorted(self.speed_points, reverse=False)
-        v_i = speed_points[0, 1]
-        a_i = 0
-        for i in range(len(speed_points)):
-            index_i = int(speed_points[i, 0] * 100)
-            d_i = self.dists[index_i]
-            v_max = speed_points[i, 1]
-            if i + 1 < len(speed_points):
-                index_f = int(speed_points[i + 1, 0] * 100)
-                d_f = self.dists[index_f]
-                vmax_f = speed_points[i + 1, 1]
-            else:
-                d_f = self.dists[-1]
-                vmax_f = speed_points[0, 1]
 
-            if vmax_f > v_i: # Speed up
-                self.fill_speed_up_profile(v_i, d_i, v_max) 
-                
-        for position, value in speed_points: # Speed is set from the end to the start
-            position = int(position * 100)
-            max_vels[position:index] = value
-            index = position
-        self.vels = self.compute_speed_profile(max_vels, accel_limits, jerk_limits)
-
-    def _update_dynamics(self, i, max_vel, accel_limits, jerk_limits):
+    def _update_dynamics(self, i, max_vel, accel_limits, jerk_limits, brake):
         '''
-        WORK IN PROGRESS
+        Compute jerk, accel, vel for this point according to previous point
+        Note: if previous vel/accel is not adequate, final val may exceed max_vel
         '''
         old_v = self.vels[i -1]
         dt = (self.dists[i] - self.dists[i - 1]) / old_v
@@ -184,27 +124,32 @@ class TrrPath(tdg.path.Path):
             self.vels[i] = self.vels[i - 1]
         else:
             old_a = self.accels[i - 1]
-            j = jerk_limits[1]
+            if brake:
+                j = jerk_limits[0]
+            else:
+                j = jerk_limits[1]
             a = old_a + j * dt
             if a > accel_limits[1]:
                 a = accel_limits[1]
                 j = (a - old_a) / dt
+            if a < accel_limits[0]:
+                a = accel_limits[0]
+                j = (a - old_a) / dt
             v = old_v + a * dt
-            if v > max_vel:
+            if v > max_vel and not brake:
                 a = (max_vel - old_v) / dt
                 j = (a - old_a) / dt
                 if a >= accel_limits[0] and j >= jerk_limits[0]:
                     v = max_vel
+                    
             self.jerks[i] = j
             self.accels[i] = a
             self.vels[i] = v
 
-    def _reverse_dynamics(self, i, accel_limits, jerk_limits):
+    def _braking_reverse_time(self, i, max_vel, accel_limits, jerk_limits):
         '''
-        WORK IN PROGRESS
-        '''
-        '''
-        Compute vel, accel, jerk for point i based on next point.
+        Compute vel, and accel for point i based on next point.
+        Next point accel is sometimes adjusted
         All equations are reversed to get the best slow down to
         the next point.
         '''
@@ -213,34 +158,33 @@ class TrrPath(tdg.path.Path):
             self.jerks[i] = self.jerks[i + 1]
             self.accels[i] = self.accels[i + 1]
             self.vels[i] = self.vels[i + 1]
-            return True
         else:
-            #TODO: PB car dernier a = 0
-            delta = self.vels[i + 1] * self.vels[i + 1] - 4 * self.accels[i + 1] * dd
-            dt = (math.sqrt(delta) - self.vels[i + 1]) / (-2. * self.accels[i + 1])
-            print dt
-            v = self.vels[i + 1] - self.accels[i + 1] * dt
-            if v > self.vels[i]: # TODO Wrong!
-                self.accels[i + 1] = (self.vels[i + 1] - self.vels[i]) / dt
-                self.accels[i] = self.accels[i + 1] - self.jerks[i + 1] * dt
-                self.jerks[i] = 0
-                return False
+            if self.vels[i + 1] > max_vel:
+                self.vels[i] = max_vel
+                dt = (self.dists[i + 1] - self.dists[i]) / self.vels[i]
+                self.accels[i] = -jerk_limits[1] * dt
             else:
-                a = self.accels[i + 1] - self.jerks[i + 1] * dt
-                if a < accel_limits[0]:
-                    a = accel_limits[0]
-                    self.jerks[i + 1] = (self.accels[i + 1] - a) / dt
-                self.jerks[i] = jerk_limits[0]
-                self.accels[i] = a
-                self.vels[i] = v
-                return True
+                delta = self.vels[i + 1] * self.vels[i + 1] - 4 * self.accels[i + 1] * dd
+                self.vels[i] = (self.vels[i + 1] + math.sqrt(delta)) / 2
+                if self.vels[i] > max_vel:
+                    self.vels[i] = max_vel
+                    dt = dd / self.vels[i]
+                    self.accels[i + 1] = (self.vels[i + 1] - self.vels[i]) / dt
+                else:
+                    dt = dd / self.vels[i]
+                self.accels[i] = self.accels[i + 1] - self.jerks[i + 1] * dt
+                if self.accels[i] < accel_limits[0]:
+                    self.accels[i] = accel_limits[0]
+            self.jerks[i] = jerk_limits[1]
             
     def compute_vels(self):
         '''
-        WORK IN PROGRESS
+        Strict respect of max speed, accel and jerk limits
+        CPU time consmming
+        Not perfectly smooth
         '''
-        accel_limits = [-4, 5]
-        jerk_limits = [-10, 20]
+        accel_limits = [-4, 6]
+        jerk_limits = [-15, 25]
         speed_points = sorted(self.speed_points, reverse=True)
         self.accels = np.zeros(len(self.points))
         self.jerks = np.zeros(len(self.points))
@@ -251,21 +195,40 @@ class TrrPath(tdg.path.Path):
             position = int(position * 100)
             max_vels[position:index] = value
             index = position
+        
+        # Compute end of brakings from the end
+        self.jerks[-1] = jerk_limits[1]
         self.vels[-1] = max_vels[-1]
         self.vels[0] = max_vels[0]
-        for i in range(len(max_vels)):
-            self._update_dynamics(i, max_vels[i], accel_limits, jerk_limits)
-            if self.vels[i] > max_vels[i]:
-                self.vels[i] = max_vels[i]
-                self.jerks[i] = jerk_limits[0]
-                self.accels[i] = 0
-                j = i - 1
-                while j >= 0:
-                    clipped = self._reverse_dynamics(j, accel_limits, jerk_limits)
-                    if not clipped:
-                        break
-                    j -= 1
-                        
+        dt = np.linalg.norm(self.points[0] - self.points[-1]) / self.vels[-1]
+        self.accels[-1] = -jerk_limits[1] * dt
+        i = len(max_vels) - 2
+        while i >= 0:
+            self._braking_reverse_time(i, max_vels[i], accel_limits, jerk_limits)
+            max_vels[i] = self.vels[i]
+            i -= 1
+
+        i = 0
+        slow_down_point = None
+        constraint_position = None
+        while i < len(max_vels):
+            brake = constraint_position is not None and i < constraint_position
+            self._update_dynamics(i, max_vels[i], accel_limits, jerk_limits, brake)
+            if constraint_position is not None and i == constraint_position:
+                if self.vels[i] <= max_vels[i] + 0.00001:
+                    slow_down_point = None
+                    constraint_position = None
+                else:
+                    slow_down_point -= 1
+                    i = slow_down_point - 1
+                    
+            if constraint_position is None and self.vels[i] > max_vels[i]: # + 0.0001:
+                slow_down_point = i - 1
+                constraint_position = i
+                i = slow_down_point - 1
+
+            i += 1
+                    
                     
     def compute_all(self):
         self.build_path_only()
@@ -273,16 +236,28 @@ class TrrPath(tdg.path.Path):
         self.compute_curvatures()
         self.compute_dists()
         self.len = self.dists[-1] - self.dists[0]
-        self.compute_vels_1()
+        self.compute_vels()
         self.compute_time()
         self.accels = np.zeros(len(self.points))
-        self.accels[0] = (self.vels[0] - self.vels[-1]) / (np.linalg.norm(self.points[0] - self.points[-1]) / self.vels[-1])
+        d0 = np.linalg.norm(self.points[0] - self.points[-1])
+        if d0 != 0.:
+            self.accels[0] = (self.vels[0] - self.vels[-1]) / (d0 / self.vels[-1])
         for i in range(1, len(self.vels)):
-            self.accels[i] = (self.vels[i] - self.vels[i - 1]) / (self.time[i] - self.time[i - 1])
+            dt = self.time[i] - self.time[i - 1]
+            if dt == 0.:
+                self.accels[i] = self.accels[i - 1]
+            else:
+                self.accels[i] = (self.vels[i] - self.vels[i - 1]) / dt
+
         self.jerks = np.zeros(len(self.points))
-        self.jerks[0] = (self.accels[0] - self.accels[-1]) / (np.linalg.norm(self.points[0] - self.points[-1]) / self.vels[-1])
+        if d0 != 0:
+            self.jerks[0] = (self.accels[0] - self.accels[-1]) / (d0 / self.vels[-1])
         for i in range(1, len(self.accels)):
-            self.jerks[i] = (self.accels[i] - self.accels[i - 1]) / (self.time[i] - self.time[i - 1])
+            dt = self.time[i] - self.time[i - 1]
+            if dt == 0.:
+                self.jerks[i] = self.jerks[i - 1]
+            else:
+                self.jerks[i] = (self.accels[i] - self.accels[i - 1]) / (self.time[i] - self.time[i - 1])
 
 
     def compute_time(self):

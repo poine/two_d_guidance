@@ -350,7 +350,7 @@ class ContourFinder:
         self.cnts = None
         self.cnt_max = None
         self.cnt_max_area = 0
-        self.valid_cnts = None
+        self.valid_cnts = np.array([])
 
     def has_contour(self): return (self.cnt_max is not None)
     def get_contour(self): return self.cnt_max

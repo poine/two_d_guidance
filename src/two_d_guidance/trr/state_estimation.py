@@ -12,25 +12,32 @@ import two_d_guidance.trr.utils as trr_u
 # Landmark crossing with hysteresis
 #
 class TrackMark:
-    def __init__(self, s, name, hist=5):
-        ''' landmark's abscice, name, and hysteresis window '''
+    def __init__(self, s, name, dist=2):
+        ''' landmark's abscisse, name, and monitoring distance in meters'''
         self.s, self.name = s, name
-        self.crossed = False
-        self.cnt, self.hist = 0, hist
+        self.monitoring_dist = dist
+        self.monitor = False
+        self.side = 0
+
         
-    def update(self, s, delta=0.1): # FIXME....
-        if abs(s-self.s) < delta:
-            if self.cnt < self.hist: self.cnt+=1 
-            if self.cnt == self.hist and not self.crossed:
-                self.crossed = True
-                print('passing lm {}: lm {:.3f} s {:.3f}'.format(self.name, self.s, s))
-                return True
+    def update(self, dist):
+        if abs(dist) > self.monitoring_dist:
+            self.monitor = True
         else:
-            if self.cnt > 0: self.cnt -=1
-            if self.cnt == 0:
-                self.crossed = False 
-        
+            if self.monitor:
+                if dist > 0:
+                    new_side = 1
+                else:
+                    new_side = -1
+                if self.side * new_side < 0:
+                    self.side = 0
+                    self.monitor = False
+                    print('passing lm {}: lm {:.3f} s {:.3f}'.format(self.name, self.s, dist + self.s))
+                    return True
+                else:
+                    self.side = new_side
         return False
+
         
 #
 # Naive State estimation:
@@ -54,8 +61,8 @@ class StateEstimator:
         self.meas_dist_to_start, self.meas_dist_to_finish = float('inf'), float('inf')
         self.predicted_dist_to_start, self.predicted_dist_to_finish = float('inf'), float('inf')
         self.start_residual, self.finish_residual = float('inf'), float('inf')
-        self.start_track = TrackMark(self.path.lm_s[self.path.LM_START], 'start', hist=2)
-        self.finish_track = TrackMark(self.path.lm_s[self.path.LM_FINISH], 'finish', hist=2)
+        self.start_track = TrackMark(self.path.lm_s[self.path.LM_START], 'start', dist=2)
+        self.finish_track = TrackMark(self.path.lm_s[self.path.LM_FINISH], 'finish', dist=2)
         self.last_stamp = None
 
     def load_path(self, path_filename):
@@ -79,9 +86,10 @@ class StateEstimator:
         self.sn = self._norm_s(self.s)
         self.idx_sn, _ = self.path.find_point_at_dist_from_idx(0, _d=self.sn)
         
-        if self.start_track.update(self.sn) and self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_START)
+        if self.start_track.update(self._norm_s_err(self.sn - self.start_track.s)):
+            if self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_START)
 
-        if self.finish_track.update(self.sn):
+        if self.finish_track.update(self._norm_s_err(self.sn - self.finish_track.s)):
             if self.lm_passed_cbk is not None: self.lm_passed_cbk(self.path.LM_FINISH)
             
         
