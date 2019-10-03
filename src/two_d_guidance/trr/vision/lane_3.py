@@ -36,7 +36,8 @@ class Contour3Pipeline(trr_vu.Pipeline):
             self.lane_model.fit(self.cnts_lfp)
             self.lane_model.set_valid(True)
         else:
-            self.lane_model.set_valid(False)
+            self.lane_model.set_invalid()
+        self.lane_model.stamp = stamp
 
 
 

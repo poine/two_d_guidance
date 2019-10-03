@@ -308,8 +308,8 @@ class LaneModel:
         self.valid = False
         self.inliers_mask = []
 
-    def is_valid(self): return self.valid
-    def set_valid(self, v): self.valid = v
+    def is_valid(self): return self.valid # FIXME remove that
+    def set_valid(self, v): self.valid = v 
 
     def set_invalid(self):
         self.valid = False

@@ -375,11 +375,20 @@ class TrrSimpleVisionPipeNode:
         self.cam_sys = smocap.rospy_utils.CamSysRetriever().fetch(self.cam_names, fetch_extrinsics=True, world=self.ref_frame)
         self.cam = self.cam_sys.cameras[0]; self.cam.set_undistortion_param(alpha=1.)
 
+        self.cam_lst = None
         self.pipeline = pipeline_class(self.cam, robot_name)
 
+
+        
     def start(self):
         self.cam_lst = smocap.rospy_utils.CamerasListener(cams=self.cam_names, cbk=self.on_image)
 
+    def started(self): return self.cam_lst is not None
+    
+    def stop(self):
+        self.cam_lst.unregister()
+        #self.cam_lst= None
+        
     # we get a bgr8 image as input
     def on_image(self, img_bgr, (cam_idx, stamp, seq)):
         self.pipeline.process_image(img_bgr, self.cam_sys.cameras[cam_idx], stamp, seq)
