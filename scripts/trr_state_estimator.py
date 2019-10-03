@@ -51,6 +51,7 @@ class Node(trr_rpu.PeriodicNode):
     
     def dyn_cfg_callback(self, config, level):
         self.estimator.update_k_odom(config['k_odom'])
+        self.estimator.update_k_lm(config['k_lm'])
         return config
         
     def on_odom(self, msg):
