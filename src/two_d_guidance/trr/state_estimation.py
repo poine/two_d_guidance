@@ -54,6 +54,7 @@ class StateEstimator:
         self.load_path(path_fname)
         self.s, self.sn, self.idx_sn, self.v = 0., 0., 0, 0 # abscice, normalized abscice, abscice idx, velocity
         self.k_odom = 1.
+        self.lm_gain = 0.075
         self.lm_pred = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
         self.lm_meas = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
         self.lm_res  = np.full(self.path.LM_NB, float('inf'), dtype=np.float32)
@@ -71,6 +72,8 @@ class StateEstimator:
 
     def update_k_odom(self, v): print('k_odom {}'.format(v)); self.k_odom = v
 
+    def update_k_lm(self, _v): self.lm_gain = _v
+    
     def initialize(self, s0):
         self.sn = s0
         self.idx_sn, _ = self.path.find_point_at_dist_from_idx(0, _d=self.sn)
@@ -113,16 +116,16 @@ class StateEstimator:
         while s_err < -self.path.len/2: s_err += self.path.len
         return s_err
 
-    def update_landmark(self, lm_id, m, clip_res=1., gain=0.075):
+    def update_landmark(self, lm_id, m, clip_res=1.):
         self.lm_meas[lm_id] = m
         self.lm_pred[lm_id] = self._norm_s(self.path.lm_s[lm_id]-self.sn)
         if not math.isinf(self.lm_meas[lm_id]):
             self.lm_res[lm_id] = self._norm_s_err(self.lm_meas[lm_id] - self.lm_pred[lm_id])
-            self._update_s(-gain*np.clip(self.lm_res[lm_id], -clip_res, clip_res))
+            self._update_s(-self.lm_gain*np.clip(self.lm_res[lm_id], -clip_res, clip_res))
         else:
             self.lm_res[lm_id] = float('inf')
             
-    def update_landmarks(self, meas_dist_to_start, meas_dist_to_finish, gain=0.075, disable_correction=False):
+    def update_landmarks(self, meas_dist_to_start, meas_dist_to_finish, disable_correction=False):
 
         #print('meas start {} meas finish {}'.format(meas_dist_to_start, meas_dist_to_finish))
         self.meas_dist_to_start, self.meas_dist_to_finish = meas_dist_to_start, meas_dist_to_finish
