@@ -75,6 +75,10 @@ class CarolineBirdEyeParam(BirdEyeParam):
     def __init__(self, x0=0.1, dx=2., dy=1.5, w=480):  # outside
         BirdEyeParam.__init__(self, x0, dx, dy, w)
 
+class CarolineJetsonBirdEyeParam(BirdEyeParam):
+    def __init__(self, x0=0.1, dx=2., dy=1.5, w=480):  # outside
+        BirdEyeParam.__init__(self, x0, dx, dy, w)        
+
 class ChristineBirdEyeParam(BirdEyeParam):
     #def __init__(self, x0=0.30, dx=4., dy=2., w=480):
     def __init__(self, x0=0.30, dx=3., dy=2., w=640):
@@ -83,6 +87,7 @@ class ChristineBirdEyeParam(BirdEyeParam):
 def NamedBirdEyeParam(_name):
     if    _name == 'caroline':  return CarolineBirdEyeParam()
     elif  _name == 'christine': return ChristineBirdEyeParam()
+    elif  _name == 'caroline_jetson':  return CarolineJetsonBirdEyeParam()
     return None
 
 def _make_line(p0, p1, spacing=1, endpoint=True):
