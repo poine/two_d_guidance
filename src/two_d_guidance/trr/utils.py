@@ -318,6 +318,12 @@ class LaneModel:
     def get_y(self, x):
         return np.polyval(self.coefs, x)
 
+    def fit_single_contour(self, ctr, order=3):
+        xs, ys = ctr[:,0],ctr[:,1]
+        self.coefs, _res, rank, _singular, _rcond = np.polyfit(xs, ys, order, full=True)
+        self.x_min, self.x_max = np.min(xs), np.max(xs)
+        #pdb.set_trace()
+    
     def fit_all_contours(self, ctrs, order=3):
         xs, ys, weights = [], [], []
         for c in ctrs:
