@@ -574,6 +574,11 @@ class BinaryThresholder:
         blurred = cv2.GaussianBlur(gray_img, (9, 9), 0)
         ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
         return self.threshold
+
+    def process_gray_noflt(self, gray_img):
+        blurred = cv2.GaussianBlur(gray_img, (9, 9), 0)
+        ret, self.threshold = cv2.threshold(blurred, self.thresh_val, 255, cv2.THRESH_BINARY)
+        return self.threshold
         
     def process_bgr(self, img, birdeye_mode=True):
         blue_img = img[:, :, 0]
