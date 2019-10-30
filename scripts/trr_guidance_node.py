@@ -47,7 +47,7 @@ class Node(trr_rpu.PeriodicNode):
         # dynamic reconfigurable parameters
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.trr_guidanceConfig, self.dyn_cfg_callback)
         # 
-        self.lane_model_sub = trr_rpu.LaneModelSubscriber('/trr_vision/lane/detected_model')
+        self.lane_model_sub = trr_rpu.LaneModelSubscriber('/vision/lane/detected_model', timeout=0.15)
         self.state_est_sub = trr_rpu.TrrStateEstimationSubscriber(what='guidance')
 
     def on_load_path(self, req):
@@ -72,18 +72,29 @@ class Node(trr_rpu.PeriodicNode):
 
 
     def periodic(self):
+        # if we don't have a lane, do nothing - bad, report
         try:
             self.lane_model_sub.get(self.guidance.lane)
+        except trr_rpu.NoRXMsgException:
+            rospy.loginfo_throttle(1., 'guidance (lane): NoRXMsgException')
+            return
+        except trr_rpu.RXMsgTimeoutException:
+            rospy.loginfo_throttle(1., 'guidance: (lane) RXMsgTimeoutException')
+            return
+        try:
             # abscisse, abs idx, vel, dist to start and finish
             _s, _is, _v, _ds, _df = self.state_est_sub.get()
-            self.guidance.compute(_s, _is, _v, expl_noise=0.)
-            if self.guidance.mode != trr_gui.Guidance.mode_idle:
-                self.publisher.publish_cmd(self.guidance.lin_sp, self.guidance.ang_sp)
-            self.publisher.publish_status(self.guidance)
         except trr_rpu.NoRXMsgException:
-            rospy.loginfo_throttle(1., 'guidance (lane or state_est): NoRXMsgException')
+            _s, _is, _v, _ds, _df = 0, 0, 0.5, 0., 0.
+            rospy.loginfo_throttle(1., 'guidance state_est: NoRXMsgException')
         except trr_rpu.RXMsgTimeoutException:
-            rospy.loginfo_throttle(1., 'guidance: (lane or state_est) RXMsgTimeoutException')
+            _s, _is, _v, _ds, _df = 0, 0, 0.5, 0., 0.
+            rospy.loginfo_throttle(1., 'guidance state_est: RXMsgTimeoutException')
+            
+        self.guidance.compute(_s, _is, _v, expl_noise=0.)
+        if self.guidance.mode != trr_gui.Guidance.mode_idle:
+            self.publisher.publish_cmd(self.guidance.lin_sp, self.guidance.ang_sp)
+        self.publisher.publish_status(self.guidance)
 
 
 def main(args):
