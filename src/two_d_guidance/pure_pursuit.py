@@ -18,11 +18,19 @@ class PurePursuit:
         self.look_ahead = look_ahead
         self.p2, self.R = [0, 0], 1e6
 
-    def compute(self, cur_pos, cur_psi):
-        p1, p2, end_reached, ip1, ip2 = self.path.find_carrot_looped(cur_pos, _d=self.look_ahead)
+    def set_path(self, path):
+        self.path = path
+        self.path.reset()
+ 
+    def compute(self, cur_pos, cur_psi, looped=True):
+        if looped:
+            p1, p2, end_reached, ip1, ip2 = self.path.find_carrot_looped(cur_pos, _d=self.look_ahead)
+        else:
+            p1, p2, end_reached, ip1, ip2 = self.path.find_carrot_alt(cur_pos, _d=self.look_ahead)
+            
         self.p2 = p2
-        #if end_reached:
-        #    raise EndOfPathException
+        if end_reached:
+            raise EndOfPathException
 
         p0p2_w = p2 - cur_pos
         cy, sy = math.cos(cur_psi), math.sin(cur_psi)

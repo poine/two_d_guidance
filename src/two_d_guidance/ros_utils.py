@@ -27,7 +27,7 @@ class SmocapListener:
         self.pose = msg.pose.pose
         self.ts = msg.header.stamp.to_sec()
 
-    def get_loc_and_yaw(self, max_delay=0.1):
+    def get_loc_and_yaw(self, max_delay=0.2):
         if self.ts is None:
             raise RobotNotLocalizedException
         if rospy.Time.now().to_sec() - self.ts > max_delay:
@@ -36,7 +36,7 @@ class SmocapListener:
         y = tf.transformations.euler_from_quaternion(list_of_xyzw(self.pose.orientation))[2]
         return l, y
 
-
+class RobotPoseListener(SmocapListener): pass
 
 class GazeboTruthListener:
     def __init__(self, topic='/homere/base_link_truth'):
@@ -70,3 +70,5 @@ class GazeboTruthListener:
         t, q = array_of_xyz(self.pose.position), list_of_xyzw(self.pose.orientation)
         T = smocap.utils.T_of_t_q(t, q)
         return T
+
+class RobotOdomListener(GazeboTruthListener): pass

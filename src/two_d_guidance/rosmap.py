@@ -2,6 +2,10 @@ import os, logging, yaml, numpy as np, matplotlib.image, matplotlib.pyplot as pl
 import PIL.Image, PIL.ImageDraw
 import pdb
 
+
+'''
+creates, edits maps used by ros navigation stack
+'''
 LOG = logging.getLogger('two_d_guidance.rosmap')
 
 class ROSMap:
@@ -64,6 +68,12 @@ class ROSMap:
         p2x, p2y = self.world_to_pixel(as3d(p2_w))
         self.image_draw.line([(p1x, p1y), (p2x, p2y)], fill=color, width=width)
 
+    def draw_rect_world(self, p1_w, p2_w, fill_color, outline_color):
+        def as3d(_p): return np.array([_p[0], _p[1], 0])
+        p1x, p1y = self.world_to_pixel(as3d(p1_w))
+        p2x, p2y = self.world_to_pixel(as3d(p2_w))
+        self.image_draw.rectangle([(p1x, p1y), (p2x, p2y)], fill=fill_color, outline=outline_color)
+        
     def pixel_to_world(self, p_px, alt=0.):
         p_wx, p_wy = (p_px[0]+0.5)*self.resolution, (self.size_px[1]-p_px[1]-1+0.5)*self.resolution
         return self.origin + [p_wx, p_wy, alt]
