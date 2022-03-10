@@ -10,10 +10,10 @@ import pdb
 #
 
 
-import smocap # for cameras, needs to go
-import smocap.rospy_utils
+#import smocap # for cameras, needs to go
+#import smocap.rospy_utils
 import two_d_guidance.msg
-import trr.msg
+#import trr.msg
 
 def list_of_xyz(p): return [p.x, p.y, p.z]
 def array_of_xyz(p): return np.array(list_of_xyz(p))
@@ -134,7 +134,9 @@ class TrrStartFinishSubscriber(SimpleSubscriber):
     def viewing_finish(self):
         try:
             msg = SimpleSubscriber.get(self)
-        except NoRXMsgException, RXMsgTimeoutException:
+        except NoRXMsgException:
+            return False
+        except RXMsgTimeoutException:
             return False
         return self.msg.finish_points
 #
@@ -390,7 +392,8 @@ class TrrSimpleVisionPipeNode:
         #self.cam_lst= None
         
     # we get a bgr8 image as input
-    def on_image(self, img_bgr, (cam_idx, stamp, seq)):
+    def on_image(self, img_bgr, args):
+        (cam_idx, stamp, seq) = args
         self.pipeline.process_image(img_bgr, self.cam_sys.cameras[cam_idx], stamp, seq)
         if self.pipe_cbk is not None: self.pipe_cbk()
         

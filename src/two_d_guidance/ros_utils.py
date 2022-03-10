@@ -1,6 +1,6 @@
 import math, numpy as np, scipy, rospy, geometry_msgs.msg, nav_msgs.msg, tf, pickle
 
-import smocap.utils
+#import smocap.utils
 
 def list_of_xyz(p): return [p.x, p.y, p.z]
 def array_of_xyz(p): return np.array(list_of_xyz(p))
