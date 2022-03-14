@@ -3,6 +3,8 @@
 #
 uint8 guidance_mode
 float32[] poly
+float32 xmin
+float32 xmax             
 float32 lookahead_dist
 float32 lookahead_time
 float32 carrot_x

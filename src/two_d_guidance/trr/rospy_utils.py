@@ -85,11 +85,13 @@ class GuidanceStatusPublisher(SimplePublisher):
         msg = two_d_guidance.msg.FLGuidanceStatus()
         msg.guidance_mode = model.mode
         msg.poly = model.lane.coefs
+        msg.xmin, msg.xmax = model.lane.xmin, model.lane.xmax 
         msg.lookahead_dist = model.lookahead_dist
         msg.lookahead_time = model.lookahead_time
         msg.carrot_x, msg.carrot_y = model.carrot
         msg.R = model.R
         msg.lin_sp, msg.ang_sp = model.lin_sp, model.ang_sp
+        
         SimplePublisher.publish(self, msg)
 
 class GuidanceStatusSubscriber(SimpleSubscriber):

@@ -307,6 +307,7 @@ class LaneModel:
         self.stamp = None
         self.valid = False
         self.inliers_mask = []
+        self.x_min, self.x_max = 0, 0
 
     def is_valid(self): return self.valid # FIXME remove that
     def set_valid(self, v): self.valid = v 
@@ -421,7 +422,9 @@ class LaneModel:
             
             
     def draw_on_cam_img(self, img, cam, l0=0.1, l1=0.7, color=(0,128,0)):
-        xs = np.linspace(l0, l1, 20); ys = self.get_y(xs)
+        xs = np.linspace(l0, l1, 20);
+        xs = np.linspace(self.xmin, self.xmax, 20);
+        ys = self.get_y(xs)
         pts_world = np.array([[x, y, 0] for x, y in zip(xs, ys)])
         pts_img = cam.project(pts_world)
         for i in range(len(pts_img)-1):

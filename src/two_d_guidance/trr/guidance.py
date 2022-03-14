@@ -36,7 +36,8 @@ class VelCtl:
     def reset_ref(self, v0):
         self.ref.reset(np.array([v0, 0, 0]))
         
-    def get(self, lane_model, s, _is, est_vel, dt=1./30):
+    #def get(self, lane_model, s, _is, est_vel, dt=1./30):
+    def get(self, lane_model, s, _is, est_vel, dt=1./10):
         if self.mode == VelCtl.mode_cst:
             #return self.sp # unfiltered
             vel_ref = self.ref.run(dt, self.sp)[0]
@@ -94,7 +95,7 @@ class Guidance:
         self.est_vel = 0.
         self.set_mode(Guidance.mode_idle)
         self.understeering_comp = 0
-        self.compensate = True
+        self.compensate = False#True
     
     def compute(self, s, _is, est_vel, expl_noise=0.025, dy=0., avoid_obstacles=False):
         self.est_vel = est_vel
@@ -103,6 +104,7 @@ class Guidance:
             lin = self.vel_ctl.get(self.lane, s, _is, est_vel) #, dt=delay)
             dy += self.vel_ctl.path.offsets[_is]
             self.lookahead_dist = self.lookaheads[self.lookahead_mode].get_dist(lin)
+            self.lookahead_dist = min(self.lane.xmin, self.lookahead_dist)
             self.lookahead_time = np.inf if lin == 0 else self.lookahead_dist/lin
             self.carrot = [self.lookahead_dist, self.lane.get_y(self.lookahead_dist)+dy]
             if self.compensate:
@@ -118,7 +120,7 @@ class Guidance:
         return lin, ang
 
     def set_mode(self, mode):
-        rospy.loginfo('guidance: setting mode to {} {}'.format(mode, self.est_vel))
+        rospy.loginfo(f'guidance: setting mode to {mode} (est vel{self.est_vel})')
         self.mode = mode
         self.vel_ctl.reset_ref(self.est_vel)
 
