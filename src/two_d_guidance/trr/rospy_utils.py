@@ -85,7 +85,7 @@ class GuidanceStatusPublisher(SimplePublisher):
         msg = two_d_guidance.msg.FLGuidanceStatus()
         msg.guidance_mode = model.mode
         msg.poly = model.lane.coefs
-        msg.xmin, msg.xmax = model.lane.xmin, model.lane.xmax 
+        msg.x_min, msg.x_max = model.lane.x_min, model.lane.x_max 
         msg.lookahead_dist = model.lookahead_dist
         msg.lookahead_time = model.lookahead_time
         msg.carrot_x, msg.carrot_y = model.carrot
@@ -176,6 +176,8 @@ class LaneModelPublisher(SimplePublisher):
         msg = two_d_guidance.msg.LaneModel()
         msg.header.stamp = lm.stamp
         msg.poly = lm.coefs
+        msg.x_min = lm.x_min
+        msg.x_max = lm.x_max
         SimplePublisher.publish(self, msg)
 
         
@@ -186,6 +188,8 @@ class LaneModelSubscriber(SimpleSubscriber):
     def get(self, lm):
         msg = SimpleSubscriber.get(self) # raise exceptions
         lm.coefs = self.msg.poly
+        lm.x_min = self.msg.x_min
+        lm.x_max = self.msg.x_max
         lm.stamp = self.msg.header.stamp
         lm.set_valid(True)
 
