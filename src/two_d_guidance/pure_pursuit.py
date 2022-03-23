@@ -12,11 +12,15 @@ class EndOfPathException(Exception):
     pass
 
 class PurePursuit:
+    mode_idle, mode_stopped, mode_driving, mode_nb = range(4)
     def __init__(self, path_file, params, look_ahead=0.3):
         self.path = two_d_guidance.path.Path(load=path_file)
         self.params = params
         self.look_ahead = look_ahead
         self.p2, self.R = [0, 0], 1e6
+        self.mode = PurePursuit.mode_idle
+        
+    def set_mode(self, m): self.mode = m
 
     def set_path(self, path):
         self.path = path

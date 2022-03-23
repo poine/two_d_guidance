@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os, sys, roslib, rospy, rospkg, rostopic
 import nav_msgs.msg , geometry_msgs.msg, ackermann_msgs.msg, visualization_msgs.msg
 import math, numpy as np
 
 import two_d_guidance as tdg
 import two_d_guidance.ros_utils as ros_utils
-
+ # ~/work/two_d_guidance/scripts/pp_guidance_node.py _twist_cmd_topic:=/cmd_vel _path_filename:=/home/ubuntu/work/two_d_guidance/paths/roboteck/track.npz _robot_pose_topic:=/smocap/est_marker _vel_setpoint=0.02
 #
 # rewrite of pure pursuit
 #
@@ -87,13 +87,13 @@ class Node:
         self.robot_pose_topic = rospy.get_param('~robot_pose_topic', None)
         msg_class, _msg_topic, _unused = rostopic.get_topic_class(self.robot_pose_topic, blocking=True)
         if msg_class == geometry_msgs.msg.PoseWithCovarianceStamped:
-            print 'using geometry_msgs.msg.PoseWithCovarianceStamped for robot location'
+            print('using geometry_msgs.msg.PoseWithCovarianceStamped for robot location')
             self.robot_listener = ros_utils.SmocapListener(topic=self.robot_pose_topic)
         elif msg_class == nav_msgs.msg.Odometry:
-            print 'using nav_msgs.msg.Odometry for robot location'
+            print('using nav_msgs.msg.Odometry for robot location')
             self.robot_listener = ros_utils.GazeboTruthListener(topic=self.robot_pose_topic)
         else:
-            print 'unsupported robot location message type'
+            print('unsupported robot location message type')
             rospy.signal_shutdown('unsupported robot location message class')
 
 
@@ -108,6 +108,8 @@ class Node:
         self.node_pub = NodePublisher(self.robot_ref_link)
 
         self.node_sub = rospy.Subscriber('pure_pursuit/vel_setpoint', geometry_msgs.msg.Twist, self.vel_sp_cbk)
+        self.ctl.set_mode(tdg.pure_pursuit.PurePursuit.mode_driving)
+        
         
     def vel_sp_cbk(self, msg):
         rospy.loginfo_throttle(0.5, 'vel sp {}'.format(msg.linear.x))
@@ -120,7 +122,8 @@ class Node:
             _unused, self.alpha = self.ctl.compute_looped(p0, psi)
             self.alpha += 0.025*np.sin(0.5*rospy.Time.now().to_sec())
             self.v = self.v_ctl.get(rospy.Time.now().to_sec())
-            self.publish_command()
+            if self.ctl.mode != tdg.pure_pursuit.PurePursuit.mode_idle:
+                self.publish_command()
         except ros_utils.RobotLostException:
              rospy.loginfo_throttle(0.5, 'robot lost')
         except ros_utils.RobotNotLocalizedException:
