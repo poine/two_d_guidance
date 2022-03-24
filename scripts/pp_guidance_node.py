@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-import os, sys, roslib, rospy, rospkg, rostopic
+import os, sys, roslib, rospy, rospkg, rostopic, dynamic_reconfigure.server
 import nav_msgs.msg , geometry_msgs.msg, ackermann_msgs.msg, visualization_msgs.msg
 import math, numpy as np
 
 import two_d_guidance as tdg
 import two_d_guidance.ros_utils as ros_utils
+import two_d_guidance.cfg.pure_pursuit_guidanceConfig
  # ~/work/two_d_guidance/scripts/pp_guidance_node.py _twist_cmd_topic:=/cmd_vel _path_filename:=/home/ubuntu/work/two_d_guidance/paths/roboteck/track.npz _robot_pose_topic:=/smocap/est_marker _vel_setpoint=0.02
 #
 # rewrite of pure pursuit
@@ -79,7 +80,8 @@ class Node:
                           os.path.join(rospkg.RosPack().get_path('two_d_guidance'), 'paths/demo_z/track_ethz_cam1_new.npz'))
         param = tdg.pure_pursuit.Param()
         self.l = param.L = 0.08
-        self.ctl = tdg.pure_pursuit.PurePursuit(path_filename, param)
+        look_ahead = rospy.get_param('~look_ahead', 0.3)
+        self.ctl = tdg.pure_pursuit.PurePursuit(path_filename, param, look_ahead=look_ahead) # was 0.3
         self.v_sp = rospy.get_param('~vel_setpoint', 0.5)
         self.v_ctl = VelSetpointCst(self.v_sp)
 
@@ -101,15 +103,22 @@ class Node:
         rospy.loginfo(' getting robot pose from: {} ({})'.format(self.robot_pose_topic, msg_class))   
         rospy.loginfo(' robot reference link: {} '.format(self.robot_ref_link))
         
-        rospy.loginfo(' loading path: {}'.format(path_filename))
-        rospy.loginfo('   velocity setpoint: {} m/s'.format(self.v_sp))
-        rospy.loginfo('   wheels_kinematic_l: {} m'.format(self.l))
+        rospy.loginfo(f' loading path: {path_filename}')
+        rospy.loginfo(f'   look_ahead: {look_ahead} m')
+        rospy.loginfo(f'   velocity setpoint: {self.v_sp} m/s')
+        rospy.loginfo(f'   wheels_kinematic_l: {self.l} m')
 
         self.node_pub = NodePublisher(self.robot_ref_link)
 
         self.node_sub = rospy.Subscriber('pure_pursuit/vel_setpoint', geometry_msgs.msg.Twist, self.vel_sp_cbk)
         self.ctl.set_mode(tdg.pure_pursuit.PurePursuit.mode_driving)
-        
+        self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.pure_pursuit_guidanceConfig, self.cfg_callback)
+
+    def cfg_callback(self, config, level):
+        rospy.loginfo("  Reconfigure Request:")
+        print(config)
+        #self.publisher.set_display_mode(config['display_mode'])
+        return config
         
     def vel_sp_cbk(self, msg):
         rospy.loginfo_throttle(0.5, 'vel sp {}'.format(msg.linear.x))

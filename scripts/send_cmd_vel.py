@@ -1,8 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import time, math, numpy as np
 import rospy, geometry_msgs.msg
 
-#import homere_control.msg, homere_control.utils as hcu
+#
+#  sends a test cmd_vel
+#
+# ~/work/two_d_guidance/scripts/send_cmd_vel.py _cmd_topic:=/cmd_vel _signal_type:=step_ang _amp:=0.25 _period:=10
+# ~/work/two_d_guidance/scripts/send_cmd_vel.py _cmd_topic:=/cmd_vel _siganl_type:=step_lin _amp:=0.02 _period:=10
+
+
+
 import pdb
 
 def step(t, a0=-1, a1=1, dt=4, t0=0): return a0 if math.fmod(t+t0, dt) > dt/2 else a1

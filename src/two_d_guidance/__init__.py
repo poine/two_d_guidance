@@ -7,6 +7,8 @@ from two_d_guidance.track import *
 from two_d_guidance.track_factory import *
 from two_d_guidance.rosmap import *
 
+import rospkg
+def tdg_dir():  return rospkg.RosPack().get_path('two_d_guidance')
 
 
 class VelController:

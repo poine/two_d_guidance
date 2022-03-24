@@ -96,6 +96,7 @@ generate_messages(
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
  generate_dynamic_reconfigure_options(
+    cfg/pure_pursuit_guidance.cfg
     cfg/trr_guidance.cfg
     cfg/trr_state_estimator.cfg
     cfg/trr_vision_lane.cfg
