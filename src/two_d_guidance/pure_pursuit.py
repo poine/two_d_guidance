@@ -21,6 +21,7 @@ class PurePursuit:
         self.mode = PurePursuit.mode_idle
         
     def set_mode(self, m): self.mode = m
+    def set_look_ahead_dist(self, l): self.look_ahead = l
 
     def set_path(self, path):
         self.path = path

@@ -61,6 +61,7 @@ class VelSetpointCst:
     def get(self, t):
           return self.v #+ self.v/2*np.sin(0.1*t)
 
+    def set(self, _v): self.v = _v
         
 class Node:
     def __init__(self):
@@ -111,13 +112,16 @@ class Node:
         self.node_pub = NodePublisher(self.robot_ref_link)
 
         self.node_sub = rospy.Subscriber('pure_pursuit/vel_setpoint', geometry_msgs.msg.Twist, self.vel_sp_cbk)
-        self.ctl.set_mode(tdg.pure_pursuit.PurePursuit.mode_driving)
+
+        #self.ctl.set_mode(tdg.pure_pursuit.PurePursuit.mode_driving)
+
         self.cfg_srv = dynamic_reconfigure.server.Server(two_d_guidance.cfg.pure_pursuit_guidanceConfig, self.cfg_callback)
 
     def cfg_callback(self, config, level):
         rospy.loginfo("  Reconfigure Request:")
-        print(config)
-        #self.publisher.set_display_mode(config['display_mode'])
+        self.ctl.set_mode(config['guidance_mode'])
+        self.ctl.set_look_ahead_dist(config['lookahead_dist'])
+        self.v_ctl.set(config['vel_sp'])
         return config
         
     def vel_sp_cbk(self, msg):
